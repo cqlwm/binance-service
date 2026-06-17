@@ -1,0 +1,14 @@
+[project]
+name = "binance-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "pytest-playwright>=0.8.0",
+]
+
+[project.scripts]
+binance-post = "binance_service.binance_poster:main"
+binance-screenshot = "binance_service.binance_futures_screenshot:main"
