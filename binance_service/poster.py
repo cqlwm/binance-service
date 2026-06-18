@@ -25,7 +25,7 @@ TRADE_WIDGET_SEARCH_TIMEOUT_MS = 3000
 # 交易 widget 非搜索模式下的等待时间
 TRADE_WIDGET_DEFAULT_TIMEOUT_MS = 3000
 # 发送按钮 active 状态等待超时
-SEND_BUTTON_TIMEOUT_MS = 10000
+SEND_BUTTON_TIMEOUT_MS = 30000
 # 图片上传后轮询等待上传完成的最大次数
 IMAGE_UPLOAD_POLL_COUNT = 30
 # 图片上传轮询间隔
@@ -35,16 +35,18 @@ SUPPORTED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 
 
 def _focus_input_box(page: Page) -> None:
-    page.click("div.json-article-editor")
+    editor = "div.json-article-editor"
+    page.wait_for_selector(editor)
+    page.click(editor)
 
 
 def _input_symbol(page: Page, base_asset: str) -> None:
     page.keyboard.type(f"${base_asset}")
-    selector = ".tippy-box .tippy-content .bg-cardBg"
+    icon_boxs_selector = ".tippy-box .tippy-content .bg-cardBg"
     try:
-        page.wait_for_selector(selector, timeout=30000)
+        page.wait_for_selector(icon_boxs_selector)
         time.sleep(SYMBOL_DROPDOWN_WAIT_SECONDS)
-        container = page.locator(selector)
+        container = page.locator(icon_boxs_selector)
         children = container.locator(".text-PrimaryText").all()
         for child in children:
             if child.text_content() == base_asset:
@@ -153,7 +155,7 @@ def _click_send_button(page: Page) -> None:
             }
             """,
             arg=selector,
-            timeout=SEND_BUTTON_TIMEOUT_MS,
+            timeout=SEND_BUTTON_TIMEOUT_MS
         )
         send_button.click()
     except PlaywrightTimeout:
