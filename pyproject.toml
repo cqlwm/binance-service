@@ -12,3 +12,6 @@ dependencies = [
 [project.scripts]
 binance-post = "binance_service.binance_poster:main"
 binance-screenshot = "binance_service.binance_futures_screenshot:main"
+
+[tool.pyright]
+typeCheckingMode = "strict"
