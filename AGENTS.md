@@ -52,7 +52,7 @@
     - 极简注释原则：非复杂逻辑、非特殊业务规则无需注释，通过清晰的命名体现逻辑；
     - 复杂逻辑注释：需说明「为什么这么做」而非「做了什么」，示例：
 
-      ```python
+      ```
       # 优先使用缓存而非数据库查询，因订单数据查询QPS高达1000+，缓存可降低90%数据库压力
       def get_order_detail(order_id: str) -> Order:
           cache_data = redis_client.get(f"order:{order_id}")
@@ -71,7 +71,7 @@
 4. 容器类型：标注容器内元素类型，如 `list[int]`/`tuple[str, int]`/`set[float]`，禁止仅标注 `list`/`tuple`。
 5. 自定义类型：复杂类型使用 `TypeAlias` 定义别名，提升可读性，示例：
 
-   ```python
+   ```
    from typing import TypeAlias
 
    OrderData: TypeAlias = dict[str, str | int | list[dict[str, str]]]
@@ -100,7 +100,7 @@
     - 时间戳统一使用秒级整数，禁止混用毫秒级/微秒级时间戳；
     - 时区转换需显式声明，示例：
 
-      ```python
+      ```
       from datetime import datetime, timezone
  
       # 正确：生成UTC时间
@@ -115,7 +115,7 @@
 
 1. 精准捕获：禁止捕获宽泛的 `Exception`，需捕获具体异常（如 `FileNotFoundError`/`requests.exceptions.ConnectionError`），示例：
 
-   ```python
+   ```
    # 错误
    try:
        open("config.json")
@@ -146,7 +146,7 @@
     - CRITICAL：系统级错误（如「数据库连接失败，服务不可用」）。
 3. 日志格式：包含时间（UTC）、日志级别、模块、函数、内容、请求ID（分布式场景），示例：
 
-   ```python
+   ```
    import logging
 
    logging.basicConfig(
@@ -219,7 +219,7 @@ pyright `strict` 模式下，第三方库若缺少类型定义会导致大量报
 2. 无 type stubs 的库，按库建封装模块
    在包目录下创建 `type_wrapper/*_wrapper.py`，用全类型注解的函数封装第三方 API 调用：
    **openclaw_script/type_wrapper/ccxt_wrapper.py**
-    ```python
+    ```
     def create_exchange(name: str, config: dict[str, str] | None = None) -> ccxt.Exchange:
         ...
         return exchange
