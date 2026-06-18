@@ -6,12 +6,12 @@ from pathlib import Path
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import AppConfig
-from binance_service._playwright import connect_browser
+from binance_service._playwright import connect_browser, get_or_create_page
 
 logger = logging.getLogger("screenshot")
 
 BASE_URL = "https://www.binance.com/zh-CN/futures"
-SCREENSHOT_WINDOW_WIDTH = 550
+SCREENSHOT_WINDOW_WIDTH = 500
 SCREENSHOT_WINDOW_HEIGHT = 800
 TARGET_SELECTOR = "div#chart"
 GOTO_TIMEOUT_MS = 60000
@@ -57,14 +57,13 @@ def take_futures_screenshot(
         window_width=SCREENSHOT_WINDOW_WIDTH,
         window_height=SCREENSHOT_WINDOW_HEIGHT,
     ) as browser:
-        context = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = context.new_page()
-
         try:
-            page.goto(url, wait_until="load", timeout=GOTO_TIMEOUT_MS)
-            page.wait_for_selector(
-                TARGET_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS
-            )
+            logger.warning("############# haha 123")
+            page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
+            if headless:
+                page.reload(timeout=GOTO_TIMEOUT_MS)
+
+            page.wait_for_selector(TARGET_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
             page.wait_for_timeout(CHART_INITIAL_WAIT_MS)
 
             timeframe_selector = f'div[id="{timeframe}"]'
@@ -73,32 +72,24 @@ def take_futures_screenshot(
 
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             page.wait_for_timeout(500)
-
-            page.evaluate(
-                "(()=>{"
-                "const s=document.createElement('style');"
-                "s.id='__pw_hide_sb';"
-                "s.textContent='::-webkit-scrollbar{display:none!important}';"
-                "document.head.appendChild(s);"
-                "})()"
-            )
-            page.wait_for_timeout(300)
+            page.evaluate("""(()=>{
+                const s=document.createElement('style');
+                s.id='__pw_hide_sb';
+                s.textContent='::-webkit-scrollbar{display:none!important}';
+                document.head.appendChild(s);
+            })()""")
+            page.wait_for_timeout(500)
 
             page.locator(TARGET_SELECTOR).screenshot(path=str(output_path), scale="device")
             logger.info("Screenshot saved: %s", output_path)
 
         except PlaywrightTimeout as exc:
-            raise RuntimeError(
-                f"Selector {TARGET_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms"
-            ) from exc
+            raise RuntimeError(f"Selector {TARGET_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms") from exc
         finally:
             try:
-                page.evaluate(
-                    "(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()"
-                )
-            except Exception:
-                pass
-            page.close()
+                page.evaluate("(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()")
+            finally:
+                page.close()
 
     return output_path
 
