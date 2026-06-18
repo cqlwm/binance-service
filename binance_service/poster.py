@@ -16,6 +16,7 @@ from binance_service._playwright import get_or_create_page
 logger = logging.getLogger("poster")
 
 TARGET_URL = "https://www.binance.com/zh-CN/square"
+GOTO_TIMEOUT_MS = 60000
 
 # 输入资产标签后等待下拉列表渲染的时间
 SYMBOL_DROPDOWN_WAIT_SECONDS = 3
@@ -29,6 +30,8 @@ SEND_BUTTON_TIMEOUT_MS = 10000
 IMAGE_UPLOAD_POLL_COUNT = 30
 # 图片上传轮询间隔
 IMAGE_UPLOAD_POLL_INTERVAL = 1.0
+
+SUPPORTED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 
 
 def _focus_input_box(page: Page) -> None:
@@ -167,13 +170,21 @@ def post(
     cfg = config or AppConfig.load()
 
     with connect_browser(cfg, headless=headless) as browser:
-        page = get_or_create_page(browser, TARGET_URL)
+        page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
         ensure_logged_in(page)
 
         _focus_input_box(page)
         _input_symbol(page, base_asset)
         _input_content(page, content)
         if image_path:
+            img_file = Path(image_path)
+            if not img_file.exists():
+                raise FileNotFoundError(f'Image file not found: {image_path}')
+            if img_file.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
+                raise ValueError(
+                    f'Unsupported image format: {img_file.suffix}. '
+                    f'Supported: {', '.join(sorted(SUPPORTED_IMAGE_EXTENSIONS))}'
+                )
             _paste_image(page, image_path)
         _input_trade_widget(page, base_asset)
         _click_send_button(page)
