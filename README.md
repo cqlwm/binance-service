@@ -30,6 +30,8 @@ CLI  → Playwright connect_over_cdp(127.0.0.1:18800)
 
 首次运行时自动以调试模式启动 Chrome，复用用户数据目录中的登录态。无需手动登录或管理 Cookie。
 
+**推荐使用 Headless 模式**（`--headless`）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。Headless 模式下所有功能（发帖、截图）完全正常运作。
+
 ## CLI
 
 ### binance-post — 发布帖子
@@ -38,15 +40,20 @@ CLI  → Playwright connect_over_cdp(127.0.0.1:18800)
 uv run binance-post --base <资产> --content "<正文>" [--image <图片路径>]
 ```
 
-| 参数       | 必填 | 说明                          |
-| ---------- | ---- | ----------------------------- |
-| `--base`   | 是   | 交易对基础资产，如 `DOGE`、`BTC` |
-| `--content` | 是  | 帖子正文                      |
-| `--image`  | 否   | 本地图片路径，支持 PNG / JPEG  |
+| 参数         | 必填 | 说明                            |
+| ------------ | ---- | ------------------------------- |
+| `--base`     | 是   | 交易对基础资产，如 `DOGE`、`BTC`   |
+| `--content`  | 是   | 帖子正文                        |
+| `--image`    | 否   | 本地图片路径，支持 PNG / JPEG    |
+| `--headless` | 否   | 以无头模式启动 Chrome（推荐）      |
 
 示例：
 
 ```bash
+# 推荐：Headless 模式（无 GUI）
+uv run binance-post --base DOGE --content "UP UP UP" --image /Users/li/Downloads/1.jpg --headless
+
+# 有头模式（弹出 Chrome 窗口）
 uv run binance-post --base DOGE --content "UP UP UP" --image /Users/li/Downloads/1.jpg
 ```
 
@@ -63,13 +70,18 @@ uv run binance-screenshot --symbol <交易对> [--timeframe <周期>] [--output 
 | `--symbol`    | 是   | 合约交易对，如 `BTCUSDC`、`ETHUSDC`                                                    |
 | `--timeframe` | 否   | K 线时间周期，可选 `5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认 `1h`，截图前自动切换          |
 | `--output`    | 否   | 截图保存路径，默认 `./<symbol>_<timeframe>_chart.png`                                  |
+| `--headless`  | 否   | 以无头模式启动 Chrome（推荐）                                                            |
 
 示例：
 
 ```bash
+# 推荐：Headless 模式（无 GUI）
+uv run binance-screenshot --symbol BTCUSDC --headless
+uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --headless
+uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --output /tmp/btc_1d.png --headless
+
+# 有头模式（弹出 Chrome 窗口）
 uv run binance-screenshot --symbol BTCUSDC
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h
-uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --output /tmp/btc_1d.png
 ```
 
 ## 配置
