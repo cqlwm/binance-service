@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+import base64
+import logging
+import time
+from pathlib import Path
+
+from playwright.sync_api import Page
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+from binance_service._config import AppConfig
+from binance_service._playwright import connect_browser
+from binance_service._playwright import ensure_logged_in
+from binance_service._playwright import get_or_create_page
+
+logger = logging.getLogger("poster")
+
+TARGET_URL = "https://www.binance.com/zh-CN/square"
+
+# 输入资产标签后等待下拉列表渲染的时间
+SYMBOL_DROPDOWN_WAIT_SECONDS = 3
+# 交易 widget 搜索模式下等待列表出现的时间
+TRADE_WIDGET_SEARCH_TIMEOUT_MS = 3000
+# 交易 widget 非搜索模式下的等待时间
+TRADE_WIDGET_DEFAULT_TIMEOUT_MS = 3000
+# 发送按钮 active 状态等待超时
+SEND_BUTTON_TIMEOUT_MS = 10000
+# 图片上传后轮询等待上传完成的最大次数
+IMAGE_UPLOAD_POLL_COUNT = 30
+# 图片上传轮询间隔
+IMAGE_UPLOAD_POLL_INTERVAL = 1.0
+
+
+def _focus_input_box(page: Page) -> None:
+    page.click("div.json-article-editor")
+
+
+def _input_symbol(page: Page, base_asset: str) -> None:
+    page.keyboard.type(f"${base_asset}")
+    selector = ".tippy-box .tippy-content .bg-cardBg"
+    try:
+        page.wait_for_selector(selector, timeout=30000)
+        time.sleep(SYMBOL_DROPDOWN_WAIT_SECONDS)
+        container = page.locator(selector)
+        children = container.locator(".text-PrimaryText").all()
+        for child in children:
+            if child.text_content() == base_asset:
+                logger.debug("Matched symbol: %s", child.text_content())
+                child.click()
+                break
+    except PlaywrightTimeout:
+        logger.warning("Symbol dropdown for %s not found within timeout", base_asset)
+    finally:
+        page.keyboard.type(" ")
+
+
+def _input_content(page: Page, text: str) -> None:
+    page.keyboard.type(text)
+
+
+def _paste_image(page: Page, image_path: str) -> None:
+    img_path = Path(image_path)
+    if not img_path.exists():
+        logger.error("Image file not found: %s", image_path)
+        return
+
+    mime_type = "image/png" if image_path.endswith(".png") else "image/jpeg"
+    with open(img_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode()
+
+    page.evaluate(
+        """
+        ({ base64Data, mimeType, fileName }) => {
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            const file = new File([blob], fileName, { type: mimeType });
+
+            const editor = document.querySelector('div.ProseMirror');
+            if (!editor) {
+                console.error('ProseMirror editor not found');
+                return;
+            }
+
+            editor.focus();
+
+            const dt = new DataTransfer();
+            dt.items.add(file);
+
+            const pasteEvent = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: dt
+            });
+
+            editor.dispatchEvent(pasteEvent);
+        }
+        """,
+        {"base64Data": image_data, "mimeType": mime_type, "fileName": "image.jpg"},
+    )
+
+    img = page.wait_for_selector(".short-editor-content img", timeout=30000)
+
+    for _ in range(IMAGE_UPLOAD_POLL_COUNT):
+        src = img.get_attribute("src") or ""
+        if src.startswith("/bapi/fe/resource/image"):
+            break
+        page.wait_for_timeout(int(IMAGE_UPLOAD_POLL_INTERVAL * 1000))
+    else:
+        logger.warning("Image upload did not complete within poll limit")
+
+
+def _input_trade_widget(page: Page, base_asset: str) -> None:
+    trade_widget_list_selector = ".bg-CardBg .text-PrimaryText"
+    try:
+        page.wait_for_selector(trade_widget_list_selector, timeout=TRADE_WIDGET_DEFAULT_TIMEOUT_MS)
+    except PlaywrightTimeout:
+        logger.warning("Trade widget list not found, attempting search mode")
+
+    if page.locator(trade_widget_list_selector).count() == 0:
+        page.click(".trade-widget-icon.icon-box")
+        symbol_name_input_selector = ".bg-CardBg .bn-textField-input"
+        page.wait_for_selector(symbol_name_input_selector)
+        page.fill(symbol_name_input_selector, base_asset)
+        time.sleep(1)
+
+    target = f"{base_asset}USDT"
+    elements = page.locator(trade_widget_list_selector).all()
+    for el in elements:
+        logger.debug("Trade widget option: %s", el.text_content())
+        if el.text_content() == target:
+            el.click()
+            break
+
+
+def _click_send_button(page: Page) -> None:
+    selector = ".short-editor-inner button"
+    send_button = page.locator(selector, has_text="发文")
+    try:
+        page.wait_for_function(
+            """
+            (selector) => {
+                const btn = document.querySelector(selector);
+                if (!btn) return false;
+                return !btn.classList.contains('inactive');
+            }
+            """,
+            arg=selector,
+            timeout=SEND_BUTTON_TIMEOUT_MS,
+        )
+        send_button.click()
+    except PlaywrightTimeout:
+        logger.warning("Send button remained inactive, skipping click")
+
+
+def post(
+    base_asset: str,
+    content: str,
+    image_path: str | None = None,
+    headless: bool = False,
+    config: AppConfig | None = None,
+) -> None:
+    cfg = config or AppConfig.load()
+
+    with connect_browser(cfg, headless=headless) as browser:
+        page = get_or_create_page(browser, TARGET_URL)
+        ensure_logged_in(page)
+
+        _focus_input_box(page)
+        _input_symbol(page, base_asset)
+        _input_content(page, content)
+        if image_path:
+            _paste_image(page, image_path)
+        _input_trade_widget(page, base_asset)
+        _click_send_button(page)
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="发布 Binance Square 帖子")
+    parser.add_argument("--base", required=True, help="交易对基础资产，如 DOGE")
+    parser.add_argument("--content", required=True, help="帖子正文内容")
+    parser.add_argument("--image", default=None, help="可选，本地图片路径")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="以无头模式启动 Chrome（无 GUI），Chrome 未运行时自动启动",
+    )
+    args = parser.parse_args()
+    post(args.base, args.content, args.image, headless=args.headless)
+
+
+if __name__ == "__main__":
+    main()

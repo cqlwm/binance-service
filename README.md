@@ -30,18 +30,6 @@ CLI  → Playwright connect_over_cdp(127.0.0.1:18800)
 
 首次运行时自动以调试模式启动 Chrome，复用用户数据目录中的登录态。无需手动登录或管理 Cookie。
 
-### 截图流程
-
-截图 CLI 会在截图前临时缩放 Chrome 窗口至目标尺寸（500×800），确保 TradingView 图表以精确分辨率渲染：
-
-```
-获取原始窗口大小 → 缩至 500×800
-  → 打开新标签 → 导航到合约页
-  → 等待图表加载（3s）
-  → 滚动到底部 → 隐藏滚动条
-  → 截图 → 恢复窗口大小 → 关闭标签
-```
-
 ## CLI
 
 ### binance-post — 发布帖子
@@ -84,9 +72,9 @@ uv run binance-screenshot --symbol ETHUSDC --timeframe 4h
 uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --output /tmp/btc_1d.png
 ```
 
-### 配置
+## 配置
 
-可在 `.env` 文件中指定 Chrome 可执行文件路径和用户数据目录：
+可在项目根目录的 `.env` 文件中指定 Chrome 可执行文件路径和用户数据目录：
 
 ```env
 CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
@@ -94,24 +82,25 @@ USER_DATA_DIR=~/.debug_chrome/1/user-data
 DEBUG_PORT=18800
 ```
 
+所有配置均有默认值，不配置 `.env` 也可直接使用。
+
 ## 项目结构
 
 ```
 binance_service/
-├── binance_service/
-│   ├── __init__.py
-│   ├── _chrome.py                     # Chrome 调试启动 & CDP 连接管理
-│   ├── binance_poster.py              # 发帖 CLI
-│   └── binance_futures_screenshot.py  # 合约页截图 CLI
-├── pyproject.toml
-└── README.md
+├── __init__.py                # 公开 API
+├── _config.py                 # 配置管理（从 .env 加载）
+├── _chrome.py                 # Chrome 进程管理（启动/检测 CDP）
+├── _playwright.py             # Playwright 连接管理（connect + page）
+├── poster.py                  # 发帖业务逻辑
+└── screenshot.py              # 截图业务逻辑
 ```
 
 ## 常见问题
 
 **Q: 截图模糊/只有黑色？**
 
-确保截图前 Chrome 窗口未被其他操作打断。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `SELECTOR_TIMEOUT_MS`。
+确保截图前 Chrome 窗口未被其他操作打断。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `CHART_INITIAL_WAIT_MS`。
 
 **Q: 报错 `CDP port not ready`？**
 

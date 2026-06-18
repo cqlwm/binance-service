@@ -7,51 +7,56 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-import dotenv
+from binance_service._config import AppConfig
 
 logger = logging.getLogger("chrome")
 
-dotenv.load_dotenv()
-
-CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-USER_DATA_DIR = "/Users/li/.debug_chrome/1/user-data"
-DEBUG_ADDRESS = "127.0.0.1"
-DEBUG_PORT = 18800
-DEBUG_URL = f"http://{DEBUG_ADDRESS}:{DEBUG_PORT}"
-VERSION_URL = f"{DEBUG_URL}/json/version"
+CDP_RETRY_COUNT = 20
+CDP_RETRY_INTERVAL = 0.5
 
 
-def is_cdp_ready() -> bool:
+def is_cdp_ready(config: AppConfig) -> bool:
     try:
-        with urlopen(VERSION_URL, timeout=1):
+        with urlopen(config.chrome.version_url, timeout=1):
             return True
-    except URLError:
+    except (URLError, TimeoutError, OSError):
         return False
 
 
-def ensure_debug_chrome_running(headless: bool = False, window_size: str | None = None) -> None:
-    chrome_path = Path(CHROME_BIN)
+def ensure_debug_chrome_running(
+    config: AppConfig,
+    headless: bool = False,
+    window_width: int | None = None,
+    window_height: int | None = None,
+) -> None:
+    chrome_path = Path(config.chrome.bin_path)
     if not chrome_path.exists():
-        raise FileNotFoundError(f"Local ChromeBrowser not found: {chrome_path}")
+        raise FileNotFoundError(f"Chrome not found: {chrome_path}")
 
-    if is_cdp_ready():
-        logger.info(f"Debug port ready: {VERSION_URL}.")
+    if is_cdp_ready(config):
+        logger.info("CDP debug port ready: %s", config.chrome.version_url)
         return
 
     args = [
-        CHROME_BIN,
-        f"--remote-debugging-port={DEBUG_PORT}",
-        f"--remote-debugging-address={DEBUG_ADDRESS}",
-        f"--user-data-dir={USER_DATA_DIR}",
+        config.chrome.bin_path,
+        f"--remote-debugging-port={config.chrome.debug_port}",
+        f"--remote-debugging-address={config.chrome.debug_address}",
+        f"--user-data-dir={config.chrome.user_data_dir}",
         "--no-first-run",
         "--no-default-browser-check",
     ]
+
     if headless:
         args.append("--headless=new")
-        if not window_size:
-            args.append("--window-size=1920,1080")
-    if window_size:
-        args.append(f"--window-size={window_size}")
+
+    win_w = window_width or config.window.width
+    win_h = window_height or config.window.height
+    args.append(f"--window-size={win_w},{win_h}")
+
+    logger.info(
+        "Launching Chrome (headless=%s, window=%dx%d)",
+        headless, win_w, win_h,
+    )
 
     subprocess.Popen(
         args,
@@ -60,13 +65,13 @@ def ensure_debug_chrome_running(headless: bool = False, window_size: str | None 
         start_new_session=True,
     )
 
-    for _ in range(20):
-        if is_cdp_ready():
+    for _ in range(CDP_RETRY_COUNT):
+        if is_cdp_ready(config):
             return
-        time.sleep(0.5)
+        time.sleep(CDP_RETRY_INTERVAL)
 
     raise RuntimeError(
-        f"CDP port not ready: {VERSION_URL}."
-        " Please fully exit all Chrome processes and try again, "
-        "or manually launch a standalone instance with --user-data-dir."
+        f"CDP port {config.chrome.debug_url} not ready after "
+        f"{CDP_RETRY_COUNT * CDP_RETRY_INTERVAL}s. "
+        "Please fully exit all Chrome processes and try again."
     )

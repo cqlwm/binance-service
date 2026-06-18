@@ -1,7 +1,7 @@
 [project]
 name = "binance-service"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "通过 Chrome 自动化操作币安（Binance）的命令行工具集，复用本地 Chrome 登录态，无需 API Key"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -10,8 +10,16 @@ dependencies = [
 ]
 
 [project.scripts]
-binance-post = "binance_service.binance_poster:main"
-binance-screenshot = "binance_service.binance_futures_screenshot:main"
+binance-post = "binance_service.poster:main"
+binance-screenshot = "binance_service.screenshot:main"
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
 
 [tool.pyright]
 typeCheckingMode = "strict"
+ignore = ["binance_service/type_wrapper/*_wrapper.py"]
