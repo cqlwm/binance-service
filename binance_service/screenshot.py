@@ -11,8 +11,8 @@ from binance_service._playwright import connect_browser, get_or_create_page
 logger = logging.getLogger("screenshot")
 
 BASE_URL = "https://www.binance.com/zh-CN/futures"
-SCREENSHOT_WINDOW_WIDTH = 500
-SCREENSHOT_WINDOW_HEIGHT = 800
+SCREENSHOT_WINDOW_WIDTH = 430
+SCREENSHOT_WINDOW_HEIGHT = 932
 TARGET_SELECTOR = "div#chart"
 GOTO_TIMEOUT_MS = 60000
 SELECTOR_TIMEOUT_MS = 15000
@@ -60,8 +60,6 @@ def take_futures_screenshot(
         try:
             logger.warning("############# haha 123")
             page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
-            if headless:
-                page.reload(timeout=GOTO_TIMEOUT_MS)
 
             page.wait_for_selector(TARGET_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
             page.wait_for_timeout(CHART_INITIAL_WAIT_MS)
@@ -96,6 +94,12 @@ def take_futures_screenshot(
 
 def main() -> None:
     import argparse
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s UTC %(levelname)s %(module)s.%(funcName)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     parser = argparse.ArgumentParser(
         description=(
