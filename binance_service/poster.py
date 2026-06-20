@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from playwright.sync_api import Page
@@ -26,12 +27,30 @@ TRADE_WIDGET_SEARCH_TIMEOUT_MS = 3000
 TRADE_WIDGET_DEFAULT_TIMEOUT_MS = 3000
 # 发送按钮 active 状态等待超时
 SEND_BUTTON_TIMEOUT_MS = 30000
+# 发送 API 响应等待超时
+SEND_API_TIMEOUT_MS = 30000
 # 图片上传后轮询等待上传完成的最大次数
 IMAGE_UPLOAD_POLL_COUNT = 30
 # 图片上传轮询间隔
 IMAGE_UPLOAD_POLL_INTERVAL = 1.0
 
 SUPPORTED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
+
+# 调试截图输出目录
+DEBUG_SCREENSHOT_DIR = Path.home() / ".debug_chrome" / "screenshots"
+
+# 发帖 API 路径
+POST_API_URL = "https://www.binance.com/bapi/composite/v5/private/pgc/content/add"
+
+
+def _debug_screenshot(page: Page, label: str) -> None:
+    """Save a full-page screenshot for debugging, named by step label."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    output_dir = DEBUG_SCREENSHOT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / f"{ts}_{label}.png"
+    page.screenshot(path=str(path), full_page=True)
+    logger.info("Debug screenshot saved: %s", path)
 
 
 def _focus_input_box(page: Page) -> None:
@@ -157,9 +176,17 @@ def _click_send_button(page: Page) -> None:
             arg=selector,
             timeout=SEND_BUTTON_TIMEOUT_MS
         )
-        send_button.click()
+        with page.expect_response(
+            lambda resp: POST_API_URL in resp.url,
+            timeout=SEND_API_TIMEOUT_MS,
+        ) as response_info:
+            send_button.click()
+        response = response_info.value
+        status = response.status
+        body = response.json()
+        logger.info("Post API responded with status=%d, body=%s", status, body)
     except PlaywrightTimeout:
-        logger.warning("Send button remained inactive, skipping click")
+        logger.warning("Send button remained inactive or API did not respond, skipping click")
 
 
 def post(
@@ -167,6 +194,7 @@ def post(
     content: str,
     image_path: str | None = None,
     headless: bool = False,
+    debug: bool = False,
 ) -> None:
     cfg = AppConfig.load()
 
@@ -174,9 +202,21 @@ def post(
         page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
         ensure_logged_in(page)
 
+        if debug:
+            _debug_screenshot(page, "01_after_login")
+
         _focus_input_box(page)
+        if debug:
+            _debug_screenshot(page, "02_after_focus_input")
+
         _input_symbol(page, base_asset)
+        if debug:
+            _debug_screenshot(page, "03_after_input_symbol")
+
         _input_content(page, content)
+        if debug:
+            _debug_screenshot(page, "04_after_input_content")
+
         if image_path:
             img_file = Path(image_path)
             if not img_file.exists():
@@ -187,12 +227,26 @@ def post(
                     f'Supported: {', '.join(sorted(SUPPORTED_IMAGE_EXTENSIONS))}'
                 )
             _paste_image(page, image_path)
+            if debug:
+                _debug_screenshot(page, "05_after_paste_image")
+
         _input_trade_widget(page, base_asset)
+        if debug:
+            _debug_screenshot(page, "06_after_trade_widget")
+
         _click_send_button(page)
+        if debug:
+            _debug_screenshot(page, "07_after_send")
 
 
 def main() -> None:
     import argparse
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s UTC %(levelname)s %(module)s.%(funcName)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     parser = argparse.ArgumentParser(description="发布 Binance Square 帖子")
     parser.add_argument("--base", required=True, help="交易对基础资产，如 DOGE")
@@ -203,8 +257,13 @@ def main() -> None:
         action="store_true",
         help="以无头模式启动 Chrome（无 GUI），Chrome 未运行时自动启动",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="启用调试模式，每一步都截图保存到 ~/.debug_chrome/screenshots/",
+    )
     args = parser.parse_args()
-    post(args.base, args.content, args.image, headless=args.headless)
+    post(args.base, args.content, args.image, headless=args.headless, debug=args.debug)
 
 
 if __name__ == "__main__":

@@ -88,8 +88,37 @@ def _restore_storage_state(context, storage_state_path: str) -> None:
     try:
         with open(path) as f:
             state = json.load(f)
-        context.add_cookies(state.get("cookies", []))
-        logger.info("Restored %d cookies from %s", len(state.get("cookies", [])), path)
+
+        # 恢复 cookies
+        cookies = state.get("cookies", [])
+        context.add_cookies(cookies)
+        logger.info("Restored %d cookies from %s", len(cookies), path)
+
+        # 恢复 localStorage（每个 origin 需开一个页面写入）
+        origins = state.get("origins", [])
+        for entry in origins:
+            origin = entry["origin"]
+            ls_items = entry.get("localStorage", [])
+            if not ls_items:
+                continue
+            page = context.new_page()
+            try:
+                page.goto(origin, wait_until="domcontentloaded")
+                for item in ls_items:
+                    page.evaluate(
+                        "({ name, value }) => localStorage.setItem(name, value)",
+                        {"name": item["name"], "value": item["value"]},
+                    )
+                logger.debug(
+                    "Restored %d localStorage items for %s", len(ls_items), origin,
+                )
+            except Exception:
+                logger.warning("Failed to restore localStorage for %s", origin)
+            finally:
+                page.close()
+        logger.info(
+            "Restored localStorage for %d origins", len(origins),
+        )
     except Exception:
         logger.exception("Failed to restore storage state from %s", path)
 
@@ -114,7 +143,8 @@ def save_storage_state(config: AppConfig, target_url: str | None = None) -> None
             json.dump(state, f)
         cookie_count = len(state.get("cookies", []))
         logger.info(
-            "Saved storage state (%d cookies) to %s", cookie_count, output,
+            "Saved storage state (%d cookies, %d origins) to %s",
+            cookie_count, len(state.get("origins", [])), output,
         )
         page.close()
 
