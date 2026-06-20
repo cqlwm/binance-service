@@ -1,2 +1,4 @@
 .idea
 binance_service.egg-info
+binance_service/__pycache__/
+.DS_Store
