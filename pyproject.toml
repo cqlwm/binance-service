@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "dotenv>=0.9.9",
+    "pillow>=12.2.0",
     "pytest-playwright>=0.8.0",
 ]
 
