@@ -23,12 +23,8 @@ def is_cdp_ready(config: AppConfig) -> bool:
         return False
 
 
-def ensure_debug_chrome_running(
-    config: AppConfig,
-    headless: bool = False,
-    window_width: int | None = None,
-    window_height: int | None = None,
-) -> None:
+def ensure_cdp_chrome_running(config: AppConfig) -> None:
+    """Ensure a Chrome instance with CDP debug port is running (headed mode)."""
     chrome_path = Path(config.chrome.bin_path)
     if not chrome_path.exists():
         raise FileNotFoundError(f"Chrome not found: {chrome_path}")
@@ -37,6 +33,9 @@ def ensure_debug_chrome_running(
         logger.info("CDP debug port ready: %s", config.chrome.version_url)
         return
 
+    w = config.window.width
+    h = config.window.height
+
     args = [
         config.chrome.bin_path,
         f"--remote-debugging-port={config.chrome.debug_port}",
@@ -44,19 +43,10 @@ def ensure_debug_chrome_running(
         f"--user-data-dir={config.chrome.user_data_dir}",
         "--no-first-run",
         "--no-default-browser-check",
+        f"--window-size={w},{h}",
     ]
 
-    if headless:
-        args.append("--headless=new")
-
-    win_w = window_width or config.window.width
-    win_h = window_height or config.window.height
-    args.append(f"--window-size={win_w},{win_h}")
-
-    logger.info(
-        "Launching Chrome (headless=%s, window=%dx%d)",
-        headless, win_w, win_h,
-    )
+    logger.info("Launching Chrome (window=%dx%d)", w, h)
 
     subprocess.Popen(
         args,
@@ -75,3 +65,18 @@ def ensure_debug_chrome_running(
         f"{CDP_RETRY_COUNT * CDP_RETRY_INTERVAL}s. "
         "Please fully exit all Chrome processes and try again."
     )
+
+
+def check_user_data_dir_available(config: AppConfig) -> None:
+    """Raise if the user data dir is locked by another Chrome instance."""
+    if not is_cdp_ready(config):
+        return
+
+    msg = (
+        f"User data dir is locked by a running Chrome instance on {config.chrome.debug_url}.\n"
+        f"  User data dir: {config.chrome.user_data_dir}\n\n"
+        "  Headless mode cannot share the same user data dir with headed Chrome.\n"
+        "  Please fully quit the existing Chrome process and retry.\n"
+        f"  You can run: lsof -ti :{config.chrome.debug_port} | xargs kill\n"
+    )
+    raise RuntimeError(msg)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from binance_service._config import AppConfig
+from binance_service._config import AppConfig, WindowConfig
 from binance_service._playwright import connect_browser, get_or_create_page
 
 logger = logging.getLogger("screenshot")
@@ -51,14 +51,8 @@ def take_futures_screenshot(
     url = f"{BASE_URL}/{symbol}"
     cfg = config or AppConfig.load()
 
-    with connect_browser(
-        cfg,
-        headless=headless,
-        window_width=SCREENSHOT_WINDOW_WIDTH,
-        window_height=SCREENSHOT_WINDOW_HEIGHT,
-    ) as browser:
+    with connect_browser(cfg, headless=headless) as browser:
         try:
-            logger.warning("############# haha 123")
             page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
 
             page.wait_for_selector(TARGET_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
@@ -127,7 +121,13 @@ def main() -> None:
         help="以无头模式启动 Chrome（无 GUI）",
     )
     args = parser.parse_args()
-    take_futures_screenshot(args.symbol, args.timeframe, args.output, headless=args.headless)
+
+    config = AppConfig(
+        AppConfig.load().chrome,
+        WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT)
+    )
+
+    take_futures_screenshot(args.symbol, args.timeframe, args.output, headless=args.headless, config=config)
 
 
 if __name__ == "__main__":
