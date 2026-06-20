@@ -167,9 +167,8 @@ def post(
     content: str,
     image_path: str | None = None,
     headless: bool = False,
-    config: AppConfig | None = None,
 ) -> None:
-    cfg = config or AppConfig.load()
+    cfg = AppConfig.load()
 
     with connect_browser(cfg, headless=headless) as browser:
         page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)

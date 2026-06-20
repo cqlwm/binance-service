@@ -11,6 +11,8 @@ import dotenv
 class ChromeConfig:
     bin_path: str = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     user_data_dir: str = str(Path.home() / ".debug_chrome" / "1" / "user-data")
+    headless_user_data_dir: str = str(Path.home() / ".debug_chrome" / "1" / "headless-user-data")
+    storage_state_path: str = str(Path.home() / ".debug_chrome" / "1" / "storage_state.json")
     debug_address: str = "127.0.0.1"
     debug_port: int = 18800
 
@@ -40,6 +42,8 @@ class AppConfig:
         chrome = ChromeConfig(
             bin_path=os.getenv("CHROME_BIN", ChromeConfig.bin_path),
             user_data_dir=os.getenv("USER_DATA_DIR", ChromeConfig.user_data_dir),
+            headless_user_data_dir=os.getenv("HEADLESS_USER_DATA_DIR", ChromeConfig.headless_user_data_dir),
+            storage_state_path=os.getenv("STORAGE_STATE_PATH", ChromeConfig.storage_state_path),
             debug_address=os.getenv("DEBUG_ADDRESS", ChromeConfig.debug_address),
             debug_port=int(os.getenv("DEBUG_PORT", str(ChromeConfig.debug_port))),
         )
