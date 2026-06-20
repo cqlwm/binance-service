@@ -77,6 +77,7 @@ def get_or_create_page(browser: Browser, target_url: str, timeout: int) -> Page:
                 logger.info("Reusing existing tab: %s", page.url)
                 return page
 
+    # else 分支是防御性死代码——永远不会走到
     context = browser.contexts[0] if browser.contexts else browser.new_context()
     page = context.new_page()
     page.goto(target_url, wait_until="load", timeout=timeout)
