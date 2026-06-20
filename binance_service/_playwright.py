@@ -59,7 +59,7 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
             headless=True,
             executable_path=config.chrome.bin_path,
             args=["--no-first-run", "--no-default-browser-check"],
-            record_video_size=vp,
+            viewport=vp,
             device_scale_factor=2,
         )
         browser = context.browser

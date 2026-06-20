@@ -35,11 +35,11 @@ def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Pat
 
 
 def take_futures_screenshot(
+    config: AppConfig,
     symbol: str,
     timeframe: str = DEFAULT_TIMEFRAME,
     output: str | None = None,
     headless: bool = False,
-    config: AppConfig | None = None,
 ) -> Path:
     if timeframe not in TIMEFRAME_CHOICES:
         raise ValueError(
@@ -49,9 +49,8 @@ def take_futures_screenshot(
 
     output_path = _resolve_output_path(symbol, timeframe, output)
     url = f"{BASE_URL}/{symbol}"
-    cfg = config or AppConfig.load()
 
-    with connect_browser(cfg, headless=headless) as browser:
+    with connect_browser(config, headless=headless) as browser:
         try:
             page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
 
@@ -127,7 +126,13 @@ def main() -> None:
         WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT)
     )
 
-    take_futures_screenshot(args.symbol, args.timeframe, args.output, headless=args.headless, config=config)
+    take_futures_screenshot(
+        config=config,
+        symbol=args.symbol,
+        timeframe=args.timeframe,
+        output=args.output,
+        headless=args.headless,
+    )
 
 
 if __name__ == "__main__":
