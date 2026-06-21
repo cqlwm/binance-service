@@ -17,8 +17,8 @@ logger = logging.getLogger("playwright")
 
 
 @contextmanager
-def connect_browser(config: AppConfig, headless: bool = False) -> Iterator[Browser]:
-    if headless:
+def connect_browser(config: AppConfig) -> Iterator[Browser]:
+    if config.headless:
         with _launch_headless_browser(config) as browser:
             yield browser
     else:

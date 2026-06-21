@@ -24,7 +24,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cfg = AppConfig.load()
+    cfg = AppConfig()
     save_storage_state(cfg, target_url=args.url)
 
 

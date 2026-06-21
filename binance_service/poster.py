@@ -193,12 +193,10 @@ def post(
     base_asset: str,
     content: str,
     image_path: str | None = None,
-    headless: bool = False,
+    app_config: AppConfig = AppConfig(),
     debug: bool = False,
 ) -> None:
-    cfg = AppConfig.load()
-
-    with connect_browser(cfg, headless=headless) as browser:
+    with connect_browser(app_config) as browser:
         page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
         ensure_logged_in(page)
 
@@ -263,7 +261,8 @@ def main() -> None:
         help="启用调试模式，每一步都截图保存到 ~/.debug_chrome/screenshots/",
     )
     args = parser.parse_args()
-    post(args.base, args.content, args.image, headless=args.headless, debug=args.debug)
+    cfg = AppConfig(headless=args.headless)
+    post(args.base, args.content, args.image, app_config=cfg, debug=args.debug)
 
 
 if __name__ == "__main__":
