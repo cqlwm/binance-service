@@ -1,96 +1,181 @@
 # Binance Service
 
-通过 Chrome 自动化操作币安（Binance）的命令行工具集，复用本地 Chrome 登录态，无需 API Key。
+通过 Chrome 自动化操作币安（Binance）的命令行工具集，复用本地 Chrome 登录态，**无需 API Key**。
 
-提供两个 CLI：
-- **binance-post** — 在币安广场发布帖子
-- **binance-screenshot** — 截取合约页 K 线图
+## 功能
+
+| 命令 | 说明 |
+|------|------|
+| `binance-post` | 在币安广场（Binance Square）发布帖子，支持图文、行情卡片 |
+| `binance-screenshot` | 截取合约页（Futures）TradingView K 线图 |
+| `binance-save-storage` | 导出 Chrome 登录态，供 Headless 模式复用 |
+
+## 工作原理
+
+脚本通过 **Chrome DevTools Protocol（CDP）** 连接到 Chrome 浏览器，在现有窗口中执行页面操作。无需手动登录或管理 Cookie。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  CLI (binance-post / binance-screenshot)                    │
+│    │                                                        │
+│    ▼                                                        │
+│  Playwright connect_over_cdp(127.0.0.1:18800)               │
+│    │                                                        │
+│    ▼                                                        │
+│  Chrome (--remote-debugging-port=18800)                     │
+│    │                                                        │
+│    ▼                                                        │
+│  Binance.com (复用本地登录态，无需 API Key)                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 两种运行模式
+
+- **Headed 模式**（默认）：连接本地已有的 Chrome 窗口，可见操作过程，适合调试和手动确认。
+- **Headless 模式**（`--headless`）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。**推荐生产环境使用**。
 
 ## 环境要求
 
 - Python >= 3.13
 - macOS，已安装 Google Chrome
-- Chrome 用户数据目录中已登录币安账号
+- Chrome 中已登录币安账号
 
 ## 安装
 
 ```bash
+# 创建虚拟环境并安装依赖
 uv sync
+
+# 安装 Playwright Chromium 浏览器引擎
 uv run playwright install chromium
 ```
 
-## 工作原理
+## 快速开始
 
-脚本通过 **Chrome DevTools Protocol（CDP）** 连接到以调试模式运行的 Chrome，在现有窗口中执行页面操作：
+### 1. 首次使用：导出登录态（Headless 模式需要）
 
+如果使用 Headless 模式，需要先通过 Headed 模式导出登录态：
+
+```bash
+# 确保 Chrome 已登录币安账号
+# 导出登录态（cookies + localStorage）
+uv run binance-save-storage
 ```
-CLI  → Playwright connect_over_cdp(127.0.0.1:18800)
-     → Chrome（--remote-debugging-port=18800, --user-data-dir=~/.debug_chrome/1/user-data）
+
+登录态会保存到 `~/.debug_chrome/1/storage_state.json`，Headless 模式会自动加载。
+
+> **注意**：登录态过期后需要重新导出。币安登录态通常有效期为数天到数周。
+
+### 2. 发布帖子
+
+```bash
+# Headless 模式（推荐）
+uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg --headless
+
+# 有头模式（弹出 Chrome 窗口）
+uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
 ```
 
-首次运行时自动以调试模式启动 Chrome，复用用户数据目录中的登录态。无需手动登录或管理 Cookie。
+### 3. 截取 K 线图
 
-**推荐使用 Headless 模式**（`--headless`）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。Headless 模式下所有功能（发帖、截图）完全正常运作。
+```bash
+# Headless 模式（推荐）
+uv run binance-screenshot --symbol BTCUSDC --headless
 
-## CLI
+# 指定周期和输出路径
+uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png --headless
+```
+
+## CLI 参考
 
 ### binance-post — 发布帖子
 
 ```bash
-uv run binance-post --base <资产> --content "<正文>" [--image <图片路径>]
+uv run binance-post --base <资产> --content "<正文>" [选项]
 ```
 
-| 参数         | 必填 | 说明                            |
-| ------------ | ---- | ------------------------------- |
-| `--base`     | 是   | 交易对基础资产，如 `DOGE`、`BTC`   |
-| `--content`  | 是   | 帖子正文                        |
-| `--image`    | 否   | 本地图片路径，支持 PNG / JPEG    |
-| `--headless` | 否   | 以无头模式启动 Chrome（推荐）      |
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--base` | 是 | 交易对基础资产，如 `DOGE`、`BTC` |
+| `--content` | 是 | 帖子正文 |
+| `--image` | 否 | 本地图片路径，支持 PNG / JPEG / GIF / WebP |
+| `--headless` | 否 | 以无头模式启动 Chrome（推荐） |
+| `--debug` | 否 | 启用调试模式，每一步截图保存到 `~/.debug_chrome/screenshots/` |
 
 示例：
 
 ```bash
-# 推荐：Headless 模式（无 GUI）
-uv run binance-post --base DOGE --content "UP UP UP" --image /Users/li/Downloads/1.jpg --headless
+# 纯文字帖子
+uv run binance-post --base DOGE --content "DOGE to the moon!" --headless
 
-# 有头模式（弹出 Chrome 窗口）
-uv run binance-post --base DOGE --content "UP UP UP" --image /Users/li/Downloads/1.jpg
+# 图文帖子
+uv run binance-post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png --headless
+
+# 调试模式（排查问题时使用）
+uv run binance-post --base DOGE --content "test" --image test.png --headless --debug
 ```
 
 ### binance-screenshot — 合约页截图
 
-截取 `div#chart` 元素的内容（币安合约 TradingView K 线图）。
+截取合约页的 TradingView K 线图（合并 switch 区域和 chart 区域为一张完整图片）。
 
 ```bash
-uv run binance-screenshot --symbol <交易对> [--timeframe <周期>] [--output <路径>]
+uv run binance-screenshot --symbol <交易对> [选项]
 ```
 
-| 参数          | 必填 | 说明                                                                                  |
-| ------------- | ---- | ------------------------------------------------------------------------------------- |
-| `--symbol`    | 是   | 合约交易对，如 `BTCUSDC`、`ETHUSDC`                                                    |
-| `--timeframe` | 否   | K 线时间周期，可选 `5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认 `1h`，截图前自动切换          |
-| `--output`    | 否   | 截图保存路径，默认 `./<symbol>_<timeframe>_chart.png`                                  |
-| `--headless`  | 否   | 以无头模式启动 Chrome（推荐）                                                            |
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--symbol` | 是 | 合约交易对，如 `BTCUSDC`、`ETHUSDC` |
+| `--timeframe` | 否 | K 线周期：`5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认 `1h` |
+| `--output` | 否 | 截图保存路径，默认 `./<symbol>_<timeframe>_chart.png` |
+| `--headless` | 否 | 以无头模式启动 Chrome（推荐） |
 
 示例：
 
 ```bash
-# 推荐：Headless 模式（无 GUI）
+# 默认 1h 周期
 uv run binance-screenshot --symbol BTCUSDC --headless
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --headless
-uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --output /tmp/btc_1d.png --headless
 
-# 有头模式（弹出 Chrome 窗口）
-uv run binance-screenshot --symbol BTCUSDC
+# 日线图
+uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --headless
+
+# 指定输出路径
+uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png --headless
 ```
+
+### binance-save-storage — 导出登录态
+
+从 Headed Chrome 导出 cookies 和 localStorage，供 Headless 模式复用。
+
+```bash
+uv run binance-save-storage [--url <页面URL>]
+```
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--url` | 否 | 登录后导航到的页面，默认 `https://www.binance.com/zh-CN/square` |
+
+登录态保存路径：`~/.debug_chrome/1/storage_state.json`
 
 ## 配置
 
-可在项目根目录的 `.env` 文件中指定 Chrome 可执行文件路径和用户数据目录：
+项目根目录的 `.env` 文件可自定义 Chrome 路径和调试端口：
 
 ```env
+# Chrome 可执行文件路径
 CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+
+# Headed 模式用户数据目录
 USER_DATA_DIR=~/.debug_chrome/1/user-data
+
+# Headless 模式用户数据目录（与 headed 模式隔离，避免锁冲突）
+HEADLESS_USER_DATA_DIR=~/.debug_chrome/1/headless-user-data
+
+# 登录态存储路径
+STORAGE_STATE_PATH=~/.debug_chrome/1/storage_state.json
+
+# CDP 调试地址和端口
+DEBUG_ADDRESS=127.0.0.1
 DEBUG_PORT=18800
 ```
 
@@ -99,26 +184,82 @@ DEBUG_PORT=18800
 ## 项目结构
 
 ```
-binance_service/
-├── __init__.py                # 公开 API
-├── _config.py                 # 配置管理（从 .env 加载）
-├── _chrome.py                 # Chrome 进程管理（启动/检测 CDP）
-├── _playwright.py             # Playwright 连接管理（connect + page）
-├── poster.py                  # 发帖业务逻辑
-└── screenshot.py              # 截图业务逻辑
+binance-service/
+├── binance_service/
+│   ├── __init__.py         # 公开 API（AppConfig, ChromeConfig, post, take_futures_screenshot）
+│   ├── _config.py          # 配置管理（从 .env 加载，dataclass 配置模型）
+│   ├── _chrome.py          # Chrome 进程管理（CDP 检测/启动）
+│   ├── _playwright.py      # Playwright 连接管理（CDP 连接 / Headless 启动 / 登录态恢复）
+│   ├── poster.py           # 发帖业务逻辑（输入内容、图片粘贴、行情卡片、发送）
+│   ├── screenshot.py       # 截图业务逻辑（导航、切换周期、合并截图）
+│   └── save_storage.py     # 登录态导出 CLI
+├── pyproject.toml          # 项目配置与依赖
+├── uv.lock                 # 依赖锁定文件
+└── README.md
 ```
 
 ## 常见问题
 
-**Q: 截图模糊/只有黑色？**
+**Q: 截图模糊或只有黑色？**
 
-确保截图前 Chrome 窗口未被其他操作打断。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `CHART_INITIAL_WAIT_MS`。
+截图前 Chrome 窗口被其他操作打断会导致渲染异常。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `CHART_INITIAL_WAIT_MS` 和 `TIMEFRAME_REDRAW_WAIT_MS` 的值。
 
 **Q: 报错 `CDP port not ready`？**
 
-关闭所有 Chrome 进程后重试：
+Chrome 调试端口未就绪。完全退出所有 Chrome 进程后重试：
 
 ```bash
 pkill -f "Google Chrome"
-uv run binance-screenshot --symbol BTCUSDC
+uv run binance-screenshot --symbol BTCUSDC --headless
+```
+
+**Q: Headless 模式提示用户数据目录被锁定？**
+
+Headed 模式和 Headless 模式使用不同的用户数据目录（`user-data` vs `headless-user-data`），正常情况下不会冲突。如果仍有锁冲突，检查是否有残留 Chrome 进程：
+
+```bash
+lsof -ti :18800 | xargs kill
+```
+
+**Q: 帖子发送按钮一直灰色不可点击？**
+
+- 确保帖子内容不为空
+- 如果使用了 `--image`，确保图片已上传完成（检查 `~/.debug_chrome/screenshots/` 中的调试截图）
+- 行情卡片（`$DOGE` 标签）需要正确匹配到交易对
+
+**Q: 如何排查发帖失败问题？**
+
+使用 `--debug` 模式，每一步都会截图保存到 `~/.debug_chrome/screenshots/`：
+
+```bash
+uv run binance-post --base DOGE --content "test" --debug
+```
+
+**Q: 登录态过期了怎么办？**
+
+重新运行 `binance-save-storage` 导出最新登录态：
+
+```bash
+# 确保 Chrome 中已重新登录币安
+uv run binance-save-storage
+```
+
+**Q: 支持 Windows / Linux 吗？**
+
+目前仅测试了 macOS。Linux 和 Windows 理论上可用，需要调整 Chrome 路径配置。
+
+## 开发
+
+```bash
+# 安装开发依赖
+uv sync
+
+# 代码格式化
+uv run ruff format binance_service/
+
+# 类型检查
+uv run mypy binance_service/
+
+# 运行测试
+uv run pytest tests/
 ```
