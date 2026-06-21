@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger("_config.py")
 
 # 配置根目录
-CONFIG_DIR = Path.home() / ".news-service"
+CONFIG_DIR = Path.home() / ".binance-service"
 _env_path = CONFIG_DIR / ".env"
 if not dotenv.load_dotenv(_env_path):
     logger.warning("Failed to load environment variables from %s", _env_path)
@@ -34,6 +34,9 @@ class ChromeConfig:
     @classmethod
     def default(cls) -> ChromeConfig:
         chrome_data_dir = Path.home() / ".debug_chrome" / "1"
+        if not os.getenv("USER_DATA_DIR"):
+            logger.warning("USER_DATA_DIR/HEADLESS_USER_DATA_DIR/STORAGE_STATE_PATH environment variables are not configured")
+
         return ChromeConfig(
             bin_path=os.getenv("CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
             user_data_dir=os.getenv("USER_DATA_DIR", (chrome_data_dir / "user-data").as_posix()),

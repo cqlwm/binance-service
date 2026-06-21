@@ -31,8 +31,8 @@
 
 ### 两种运行模式
 
-- **Headed 模式**（默认）：连接本地已有的 Chrome 窗口，可见操作过程，适合调试和手动确认。
-- **Headless 模式**（`--headless`）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。**推荐生产环境使用**。
+- **Headless 模式**（默认）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。**推荐生产环境使用**。
+- **Headed 模式**（`--headed`）：连接本地已有的 Chrome 窗口，可见操作过程，适合调试和手动确认。
 
 ## 环境要求
 
@@ -69,21 +69,21 @@ uv run binance-save-storage
 ### 2. 发布帖子
 
 ```bash
-# Headless 模式（推荐）
-uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg --headless
-
-# 有头模式（弹出 Chrome 窗口）
+# Headless 模式（默认，无需额外参数）
 uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
+
+# 有头模式（弹出 Chrome 窗口，调试用）
+uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg --headed
 ```
 
 ### 3. 截取 K 线图
 
 ```bash
-# Headless 模式（推荐）
-uv run binance-screenshot --symbol BTCUSDC --headless
+# Headless 模式（默认，无需额外参数）
+uv run binance-screenshot --symbol BTCUSDC
 
 # 指定周期和输出路径
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png --headless
+uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
 ```
 
 ## CLI 参考
@@ -99,20 +99,20 @@ uv run binance-post --base <资产> --content "<正文>" [选项]
 | `--base` | 是 | 交易对基础资产，如 `DOGE`、`BTC` |
 | `--content` | 是 | 帖子正文 |
 | `--image` | 否 | 本地图片路径，支持 PNG / JPEG / GIF / WebP |
-| `--headless` | 否 | 以无头模式启动 Chrome（推荐） |
+| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
 | `--debug` | 否 | 启用调试模式，每一步截图保存到 `~/.debug_chrome/screenshots/` |
 
 示例：
 
 ```bash
 # 纯文字帖子
-uv run binance-post --base DOGE --content "DOGE to the moon!" --headless
+uv run binance-post --base DOGE --content "DOGE to the moon!"
 
 # 图文帖子
-uv run binance-post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png --headless
+uv run binance-post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png
 
 # 调试模式（排查问题时使用）
-uv run binance-post --base DOGE --content "test" --image test.png --headless --debug
+uv run binance-post --base DOGE --content "test" --image test.png --debug
 ```
 
 ### binance-screenshot — 合约页截图
@@ -128,19 +128,19 @@ uv run binance-screenshot --symbol <交易对> [选项]
 | `--symbol` | 是 | 合约交易对，如 `BTCUSDC`、`ETHUSDC` |
 | `--timeframe` | 否 | K 线周期：`5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认 `1h` |
 | `--output` | 否 | 截图保存路径，默认 `./<symbol>_<timeframe>_chart.png` |
-| `--headless` | 否 | 以无头模式启动 Chrome（推荐） |
+| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
 
 示例：
 
 ```bash
 # 默认 1h 周期
-uv run binance-screenshot --symbol BTCUSDC --headless
+uv run binance-screenshot --symbol BTCUSDC
 
 # 日线图
-uv run binance-screenshot --symbol BTCUSDC --timeframe 1d --headless
+uv run binance-screenshot --symbol BTCUSDC --timeframe 1d
 
 # 指定输出路径
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png --headless
+uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
 ```
 
 ### binance-save-storage — 导出登录态
@@ -159,7 +159,7 @@ uv run binance-save-storage [--url <页面URL>]
 
 ## 配置
 
-项目根目录的 `.env` 文件可自定义 Chrome 路径和调试端口：
+配置文件位于 `~/.news-service/.env`，可自定义 Chrome 路径和调试端口：
 
 ```env
 # Chrome 可执行文件路径
@@ -187,7 +187,7 @@ DEBUG_PORT=18800
 binance-service/
 ├── binance_service/
 │   ├── __init__.py         # 公开 API（AppConfig, ChromeConfig, post, take_futures_screenshot）
-│   ├── _config.py          # 配置管理（从 .env 加载，dataclass 配置模型）
+│   ├── _config.py          # 配置管理（从 ~/.binance-service/.env 加载，dataclass 配置模型）
 │   ├── _chrome.py          # Chrome 进程管理（CDP 检测/启动）
 │   ├── _playwright.py      # Playwright 连接管理（CDP 连接 / Headless 启动 / 登录态恢复）
 │   ├── poster.py           # 发帖业务逻辑（输入内容、图片粘贴、行情卡片、发送）
@@ -210,7 +210,7 @@ Chrome 调试端口未就绪。完全退出所有 Chrome 进程后重试：
 
 ```bash
 pkill -f "Google Chrome"
-uv run binance-screenshot --symbol BTCUSDC --headless
+uv run binance-screenshot --symbol BTCUSDC
 ```
 
 **Q: Headless 模式提示用户数据目录被锁定？**
