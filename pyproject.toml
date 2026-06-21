@@ -1,6 +1,6 @@
 [project]
 name = "binance-service"
-version = "0.2.1"
+version = "0.2.2"
 description = "通过 Chrome 自动化操作币安（Binance）的命令行工具集，复用本地 Chrome 登录态，无需 API Key"
 readme = "README.md"
 requires-python = ">=3.13"
