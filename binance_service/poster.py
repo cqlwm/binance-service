@@ -161,7 +161,7 @@ def _input_trade_widget(page: Page, base_asset: str) -> None:
             break
 
 
-def _click_send_button(page: Page) -> None:
+def _click_send_button(page: Page) -> str | None:
     selector = ".short-editor-inner button"
     send_button = page.locator(selector, has_text="发文")
     try:
@@ -185,8 +185,12 @@ def _click_send_button(page: Page) -> None:
         status = response.status
         body = response.json()
         logger.info("Post API responded with status=%d, body=%s", status, body)
+        if body.get("success") and body.get("data", {}).get("shareLink"):
+            return body["data"]["shareLink"]
+        return None
     except PlaywrightTimeout:
         logger.warning("Send button remained inactive or API did not respond, skipping click")
+        return None
 
 
 def post(
@@ -195,7 +199,7 @@ def post(
     image_path: str | None = None,
     app_config: AppConfig = AppConfig(),
     debug: bool = False,
-) -> None:
+) -> str | None:
     with connect_browser(app_config) as browser:
         page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
         ensure_logged_in(page)
@@ -232,9 +236,11 @@ def post(
         if debug:
             _debug_screenshot(page, "06_after_trade_widget")
 
-        _click_send_button(page)
+        share_link = _click_send_button(page)
         if debug:
             _debug_screenshot(page, "07_after_send")
+
+    return share_link
 
 
 def main() -> None:
