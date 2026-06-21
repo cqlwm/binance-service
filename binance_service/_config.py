@@ -54,4 +54,4 @@ class WindowConfig:
 class AppConfig:
     chrome: ChromeConfig = ChromeConfig.default()
     window: WindowConfig = WindowConfig()
-    headless: bool = False
+    headless: bool = True

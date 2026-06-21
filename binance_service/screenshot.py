@@ -141,13 +141,13 @@ def main() -> None:
         help="截图保存路径，默认 ./<symbol>_<timeframe>_chart.png",
     )
     parser.add_argument(
-        "--headless",
+        "--headed",
         action="store_true",
-        help="以无头模式启动 Chrome（无 GUI）",
+        help="以有头模式启动 Chrome（显示 GUI）",
     )
     args = parser.parse_args()
 
-    cfg = AppConfig(headless=args.headless, window=WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT))
+    cfg = AppConfig(headless=not args.headed, window=WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT))
     take_futures_screenshot(
         symbol=args.symbol,
         timeframe=args.timeframe,

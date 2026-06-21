@@ -257,9 +257,9 @@ def main() -> None:
     parser.add_argument("--content", required=True, help="帖子正文内容")
     parser.add_argument("--image", default=None, help="可选，本地图片路径")
     parser.add_argument(
-        "--headless",
+        "--headed",
         action="store_true",
-        help="以无头模式启动 Chrome（无 GUI），Chrome 未运行时自动启动",
+        help="以有头模式启动 Chrome（显示 GUI）",
     )
     parser.add_argument(
         "--debug",
@@ -267,7 +267,7 @@ def main() -> None:
         help="启用调试模式，每一步都截图保存到 ~/.debug_chrome/screenshots/",
     )
     args = parser.parse_args()
-    cfg = AppConfig(headless=args.headless)
+    cfg = AppConfig(headless=not args.headed)
     post(args.base, args.content, args.image, app_config=cfg, debug=args.debug)
 
 
