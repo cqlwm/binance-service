@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -45,6 +46,8 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
     Uses a separate user data dir to avoid Singleton-lock conflicts with
     a headed Chrome instance that may be running on the same profile.
     Login state is restored from a previously saved storage-state file.
+    On successful completion, the (potentially refreshed) storage state
+    is written back so subsequent headless sessions use the latest session.
     """
     chrome_path = Path(config.chrome.bin_path)
     if not chrome_path.exists():
@@ -72,9 +75,15 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
 
         browser = context.browser
         assert browser is not None, "launch_persistent_context did not return a Browser"
+        error_occurred = False
         try:
             yield browser
+        except BaseException:
+            error_occurred = True
+            raise
         finally:
+            if not error_occurred:
+                _save_storage_state(context, config.chrome.storage_state_path)
             context.close()
 
 
@@ -123,6 +132,34 @@ def _restore_storage_state(context, storage_state_path: str) -> None:
         logger.exception("Failed to restore storage state from %s", path)
 
 
+def _save_storage_state(context, storage_state_path: str) -> None:
+    """Dump the current storage state (cookies + localStorage) to a JSON file.
+
+    Creates a backup of the previous file before overwriting, so a bad
+    session can be manually recovered from the ``.bak`` file.
+    """
+    path = Path(storage_state_path)
+    try:
+        state = context.storage_state()
+
+        # 备份旧文件
+        if path.exists():
+            bak_path = path.with_suffix(path.suffix + ".bak")
+            shutil.copy2(str(path), str(bak_path))
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(state, f)
+
+        cookie_count = len(state.get("cookies", []))
+        logger.info(
+            "Saved storage state (%d cookies, %d origins) to %s",
+            cookie_count, len(state.get("origins", [])), path,
+        )
+    except Exception:
+        logger.exception("Failed to save storage state to %s", path)
+
+
 def save_storage_state(config: AppConfig, target_url: str | None = None) -> None:
     """Connect to headed Chrome, navigate to *target_url*, and dump storage state.
 
@@ -136,16 +173,7 @@ def save_storage_state(config: AppConfig, target_url: str | None = None) -> None
             page.goto(target_url, wait_until="load")
             logger.info("Navigated to %s for storage state capture", target_url)
 
-        state = context.storage_state()
-        output = Path(config.chrome.storage_state_path)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        with open(output, "w") as f:
-            json.dump(state, f)
-        cookie_count = len(state.get("cookies", []))
-        logger.info(
-            "Saved storage state (%d cookies, %d origins) to %s",
-            cookie_count, len(state.get("origins", [])), output,
-        )
+        _save_storage_state(context, config.chrome.storage_state_path)
         page.close()
 
 
