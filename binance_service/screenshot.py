@@ -84,12 +84,7 @@ def take_futures_screenshot(
 
 
 
-def _do_screenshot(
-    browser: Browser,
-    symbol: str,
-    timeframe: str,
-    output_path: Path,
-) -> None:
+def _do_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: Path) -> None:
     url = f"{BASE_URL}/{symbol}"
 
     page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)

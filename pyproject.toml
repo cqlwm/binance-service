@@ -12,9 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-binance-post = "binance_service.poster:main"
-binance-screenshot = "binance_service.screenshot:main"
-binance-save-storage = "binance_service.save_storage:main"
+binance = "binance_service.cli:main"
 
 [build-system]
 requires = ["setuptools>=75.0"]

@@ -203,12 +203,10 @@ def post(
     debug: bool = False,
     browser: Browser | None = None,
 ) -> str | None:
-    w = app_config.window.width
-    h = app_config.window.height
     if browser is not None:
-        return _post_on_browser(browser, base_asset, content, image_path, w, h, debug)
+        return _post_on_browser(browser, base_asset, content, image_path, debug)
     with connect_browser(app_config) as b:
-        return _post_on_browser(b, base_asset, content, image_path, w, h, debug)
+        return _post_on_browser(b, base_asset, content, image_path, debug)
 
 
 
@@ -216,13 +214,10 @@ def _post_on_browser(
     browser: Browser,
     base_asset: str,
     content: str,
-    image_path: str | None,
-    width: int,
-    height: int,
-    debug: bool,
+    image_path: str | None = None,
+    debug: bool = False,
 ) -> str | None:
     page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
-    page.set_viewport_size({"width": width, "height": height})
     ensure_logged_in(page)
 
     if debug:

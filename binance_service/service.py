@@ -79,13 +79,11 @@ class BinanceService:
         参数含义同 ``binance_service.poster.post``，但复用当前浏览器实例。
         """
         return _post_on_browser(
-            self._browser_instance,
-            base_asset,
-            content,
-            image_path,
-            self._app_config.window.width,
-            self._app_config.window.height,
-            debug,
+            browser=self._browser_instance,
+            base_asset=base_asset,
+            content=content,
+            image_path=image_path,
+            debug=debug,
         )
 
     def take_futures_screenshot(
