@@ -5,9 +5,10 @@ description = "通过 Chrome 自动化操作币安（Binance）的命令行工�
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "dotenv>=0.9.9",
     "pillow>=12.2.0",
+    "playwright>=1.60.0",
     "pytest-playwright>=0.8.0",
+    "python-dotenv>=1.2.2",
 ]
 
 [project.scripts]

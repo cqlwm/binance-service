@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import logging
 import time
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from playwright.sync_api import Browser
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
@@ -37,7 +39,7 @@ IMAGE_UPLOAD_POLL_INTERVAL = 1.0
 SUPPORTED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 
 # 调试截图输出目录
-DEBUG_SCREENSHOT_DIR = Path.home() / ".debug_chrome" / "screenshots"
+DEBUG_SCREENSHOT_DIR = Path(tempfile.gettempdir()) / ".debug_chrome" / "screenshots"
 
 # 发帖 API 路径
 POST_API_URL = "https://www.binance.com/bapi/composite/v5/private/pgc/content/add"
@@ -49,7 +51,7 @@ def _debug_screenshot(page: Page, label: str) -> None:
     output_dir = DEBUG_SCREENSHOT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{ts}_{label}.png"
-    page.screenshot(path=str(path), full_page=True)
+    page.screenshot(path=path.as_posix(), full_page=True)
     logger.info("Debug screenshot saved: %s", path)
 
 
@@ -199,48 +201,68 @@ def post(
     image_path: str | None = None,
     app_config: AppConfig = AppConfig(),
     debug: bool = False,
+    browser: Browser | None = None,
 ) -> str | None:
-    with connect_browser(app_config) as browser:
-        page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
-        ensure_logged_in(page)
+    w = app_config.window.width
+    h = app_config.window.height
+    if browser is not None:
+        return _post_on_browser(browser, base_asset, content, image_path, w, h, debug)
+    with connect_browser(app_config) as b:
+        return _post_on_browser(b, base_asset, content, image_path, w, h, debug)
 
+
+
+def _post_on_browser(
+    browser: Browser,
+    base_asset: str,
+    content: str,
+    image_path: str | None,
+    width: int,
+    height: int,
+    debug: bool,
+) -> str | None:
+    page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
+    page.set_viewport_size({"width": width, "height": height})
+    ensure_logged_in(page)
+
+    if debug:
+        _debug_screenshot(page, "01_after_login")
+
+    _focus_input_box(page)
+    if debug:
+        _debug_screenshot(page, "02_after_focus_input")
+
+    _input_symbol(page, base_asset)
+    if debug:
+        _debug_screenshot(page, "03_after_input_symbol")
+
+    _input_content(page, content)
+    if debug:
+        _debug_screenshot(page, "04_after_input_content")
+
+    if image_path:
+        img_file = Path(image_path)
+        if not img_file.exists():
+            raise FileNotFoundError(f'Image file not found: {image_path}')
+        if img_file.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
+            raise ValueError(
+                f'Unsupported image format: {img_file.suffix}. '
+                f'Supported: {', '.join(sorted(SUPPORTED_IMAGE_EXTENSIONS))}'
+            )
+        _paste_image(page, image_path)
         if debug:
-            _debug_screenshot(page, "01_after_login")
+            _debug_screenshot(page, "05_after_paste_image")
 
-        _focus_input_box(page)
-        if debug:
-            _debug_screenshot(page, "02_after_focus_input")
+    _input_trade_widget(page, base_asset)
+    if debug:
+        _debug_screenshot(page, "06_after_trade_widget")
 
-        _input_symbol(page, base_asset)
-        if debug:
-            _debug_screenshot(page, "03_after_input_symbol")
-
-        _input_content(page, content)
-        if debug:
-            _debug_screenshot(page, "04_after_input_content")
-
-        if image_path:
-            img_file = Path(image_path)
-            if not img_file.exists():
-                raise FileNotFoundError(f'Image file not found: {image_path}')
-            if img_file.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
-                raise ValueError(
-                    f'Unsupported image format: {img_file.suffix}. '
-                    f'Supported: {', '.join(sorted(SUPPORTED_IMAGE_EXTENSIONS))}'
-                )
-            _paste_image(page, image_path)
-            if debug:
-                _debug_screenshot(page, "05_after_paste_image")
-
-        _input_trade_widget(page, base_asset)
-        if debug:
-            _debug_screenshot(page, "06_after_trade_widget")
-
-        share_link = _click_send_button(page)
-        if debug:
-            _debug_screenshot(page, "07_after_send")
+    share_link = _click_send_button(page)
+    if debug:
+        _debug_screenshot(page, "07_after_send")
 
     return share_link
+
 
 
 def main() -> None:

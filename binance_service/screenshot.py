@@ -5,6 +5,7 @@ from pathlib import Path
 from PIL import Image
 from tempfile import NamedTemporaryFile
 
+from playwright.sync_api import Browser
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import AppConfig, WindowConfig
@@ -61,7 +62,8 @@ def take_futures_screenshot(
     symbol: str,
     timeframe: str = DEFAULT_TIMEFRAME,
     output: str | None = None,
-    app_config: AppConfig = AppConfig(window=WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT))
+    app_config: AppConfig = AppConfig(window=WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT)),
+    browser: Browser | None = None,
 ) -> Path:
     if timeframe not in TIMEFRAME_CHOICES:
         raise ValueError(
@@ -70,45 +72,63 @@ def take_futures_screenshot(
         )
 
     output_path = _resolve_output_path(symbol, timeframe, output)
-    url = f"{BASE_URL}/{symbol}"
 
-    with connect_browser(app_config) as browser:
-        try:
-            page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
-
-            page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
-            page.wait_for_timeout(CHART_INITIAL_WAIT_MS)
-
-            timeframe_selector = f'div[id="{timeframe}"]'
-            page.locator(timeframe_selector).click()
-            page.wait_for_timeout(TIMEFRAME_REDRAW_WAIT_MS)
-
-            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            page.wait_for_timeout(500)
-            page.evaluate("""(()=>{
-                const s=document.createElement('style');
-                s.id='__pw_hide_sb';
-                s.textContent='::-webkit-scrollbar{display:none!important}';
-                document.head.appendChild(s);
-            })()""")
-            page.wait_for_timeout(500)
-
-            with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
-                page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
-                page.locator(CHART_UI_SELECTOR).screenshot(path=str(f2.name), scale="device")
-                _image_merge(f1.name, f2.name, output_path.as_posix())
-
-            logger.info("Screenshot saved: %s", output_path)
-
-        except PlaywrightTimeout as exc:
-            raise RuntimeError(f"Selector {CHART_UI_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms") from exc
-        finally:
-            try:
-                page.evaluate("(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()")
-            finally:
-                page.close()
+    if browser is not None:
+        _do_screenshot(browser, symbol, timeframe, output_path)
+    else:
+        with connect_browser(app_config) as b:
+            _do_screenshot(b, symbol, timeframe, output_path)
 
     return output_path
+
+
+
+
+def _do_screenshot(
+    browser: Browser,
+    symbol: str,
+    timeframe: str,
+    output_path: Path,
+) -> None:
+    url = f"{BASE_URL}/{symbol}"
+
+    page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
+    page.set_viewport_size({"width": SCREENSHOT_WINDOW_WIDTH, "height": SCREENSHOT_WINDOW_HEIGHT})
+
+    try:
+        page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
+        page.wait_for_timeout(CHART_INITIAL_WAIT_MS)
+
+        timeframe_selector = f'div[id="{timeframe}"]'
+        page.locator(timeframe_selector).click()
+        page.wait_for_timeout(TIMEFRAME_REDRAW_WAIT_MS)
+
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        page.wait_for_timeout(500)
+        page.evaluate("""(()=>{
+            const s=document.createElement('style');
+            s.id='__pw_hide_sb';
+            s.textContent='::-webkit-scrollbar{display:none!important}';
+            document.head.appendChild(s);
+        })()""")
+        page.wait_for_timeout(500)
+
+        with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
+            page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
+            page.locator(CHART_UI_SELECTOR).screenshot(path=str(f2.name), scale="device")
+            _image_merge(f1.name, f2.name, output_path.as_posix())
+
+        logger.info("Screenshot saved: %s", output_path)
+
+    except PlaywrightTimeout as exc:
+        raise RuntimeError(
+            f"Selector {CHART_UI_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms"
+        ) from exc
+    finally:
+        try:
+            page.evaluate("(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()")
+        finally:
+            page.close()
 
 
 def main() -> None:

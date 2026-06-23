@@ -1,0 +1,109 @@
+from __future__ import annotations
+
+import contextlib
+import logging
+from pathlib import Path
+from playwright.sync_api import Browser
+
+from binance_service._config import AppConfig
+from binance_service._playwright import connect_browser
+from binance_service.poster import _post_on_browser
+from binance_service.screenshot import _do_screenshot
+from binance_service.screenshot import TIMEFRAME_CHOICES
+from binance_service.screenshot import DEFAULT_TIMEFRAME
+from binance_service.screenshot import _resolve_output_path
+
+logger = logging.getLogger("service")
+
+
+class BinanceService:
+    """Binance 自动化操作的服务封装。
+
+    管理浏览器生命周期，外部只需维持一个对象，多次调用 post / screenshot
+    共用同一个浏览器实例，避免反复开关 Chrome。
+    """
+
+    def __init__(self, app_config: AppConfig = AppConfig(), browser: Browser | None = None) -> None:
+        self._app_config = app_config
+        self._browser = browser
+        self._owns_browser = browser is None
+        self._cm: contextlib.AbstractContextManager[Browser] | None = None
+
+    # ── 生命周期 ──────────────────────────────────────────────
+
+    @property
+    def _browser_instance(self) -> Browser:
+        if self._browser is None:
+            raise RuntimeError(
+                "Browser is not available. "
+                "Use as context manager or call open() first."
+            )
+        return self._browser
+
+    def open(self) -> None:
+        """打开浏览器（如尚未打开）。"""
+        if self._browser is not None:
+            return
+        self._owns_browser = True
+        cm = connect_browser(self._app_config)
+        self._browser = cm.__enter__()
+        self._cm = cm
+
+    def close(self) -> None:
+        """关闭浏览器。"""
+        if self._browser is None:
+            return
+        if self._owns_browser and self._cm is not None:
+            self._cm.__exit__(None, None, None)
+        self._browser = None
+        self._cm = None
+
+    def __enter__(self) -> BinanceService:
+        self.open()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
+    # ── 业务方法 ──────────────────────────────────────────────
+
+    def post(
+        self,
+        base_asset: str,
+        content: str,
+        image_path: str | None = None,
+        debug: bool = False,
+    ) -> str | None:
+        """发布 Binance Square 帖子。
+
+        参数含义同 ``binance_service.poster.post``，但复用当前浏览器实例。
+        """
+        return _post_on_browser(
+            self._browser_instance,
+            base_asset,
+            content,
+            image_path,
+            self._app_config.window.width,
+            self._app_config.window.height,
+            debug,
+        )
+
+    def take_futures_screenshot(
+        self,
+        symbol: str,
+        timeframe: str = DEFAULT_TIMEFRAME,
+        output: str | None = None,
+    ) -> Path:
+        """截取 Binance 合约 K 线图。
+
+        参数含义同 ``binance_service.screenshot.take_futures_screenshot``，
+        但复用当前浏览器实例。
+        """
+        if timeframe not in TIMEFRAME_CHOICES:
+            raise ValueError(
+                f"Invalid timeframe: {timeframe!r}. "
+                f"Choose from {TIMEFRAME_CHOICES}."
+            )
+        output_path = _resolve_output_path(symbol, timeframe, output)
+        _do_screenshot(self._browser_instance, symbol, timeframe, output_path)
+        return output_path
