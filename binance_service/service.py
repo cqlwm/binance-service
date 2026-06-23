@@ -7,8 +7,8 @@ from playwright.sync_api import Browser
 
 from binance_service._config import AppConfig
 from binance_service._playwright import connect_browser
-from binance_service.poster import _post_on_browser
-from binance_service.screenshot import _do_screenshot
+from binance_service.poster import create_post
+from binance_service.screenshot import symbol_screenshot
 from binance_service.screenshot import TIMEFRAME_CHOICES
 from binance_service.screenshot import DEFAULT_TIMEFRAME
 from binance_service.screenshot import _resolve_output_path
@@ -67,7 +67,7 @@ class BinanceService:
 
     # ── 业务方法 ──────────────────────────────────────────────
 
-    def post(
+    def create_post(
         self,
         base_asset: str,
         content: str,
@@ -78,7 +78,7 @@ class BinanceService:
 
         参数含义同 ``binance_service.poster.post``，但复用当前浏览器实例。
         """
-        return _post_on_browser(
+        return create_post(
             browser=self._browser_instance,
             base_asset=base_asset,
             content=content,
@@ -86,7 +86,7 @@ class BinanceService:
             debug=debug,
         )
 
-    def take_futures_screenshot(
+    def symbol_screenshot(
         self,
         symbol: str,
         timeframe: str = DEFAULT_TIMEFRAME,
@@ -103,5 +103,5 @@ class BinanceService:
                 f"Choose from {TIMEFRAME_CHOICES}."
             )
         output_path = _resolve_output_path(symbol, timeframe, output)
-        _do_screenshot(self._browser_instance, symbol, timeframe, output_path)
+        symbol_screenshot(self._browser_instance, symbol, timeframe, output_path)
         return output_path

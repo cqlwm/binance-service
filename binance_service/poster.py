@@ -11,8 +11,6 @@ from playwright.sync_api import Browser
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from binance_service._config import AppConfig
-from binance_service._playwright import connect_browser
 from binance_service._playwright import get_or_create_page
 
 logger = logging.getLogger("poster")
@@ -194,22 +192,7 @@ def _click_send_button(page: Page) -> str | None:
         return None
 
 
-def post(
-    base_asset: str,
-    content: str,
-    image_path: str | None = None,
-    app_config: AppConfig = AppConfig(),
-    debug: bool = False,
-    browser: Browser | None = None,
-) -> str | None:
-    if browser is not None:
-        return _post_on_browser(browser, base_asset, content, image_path, debug)
-    with connect_browser(app_config) as b:
-        return _post_on_browser(b, base_asset, content, image_path, debug)
-
-
-
-def _post_on_browser(
+def create_post(
     browser: Browser,
     base_asset: str,
     content: str,

@@ -33,7 +33,7 @@ def _build_app_config(headed: bool, window: WindowConfig | None = None) -> AppCo
 def cmd_post(args: argparse.Namespace) -> None:
     cfg = _build_app_config(args.headed)
     with BinanceService(app_config=cfg) as svc:
-        share_link = svc.post(
+        share_link = svc.create_post(
             base_asset=args.base,
             content=args.content,
             image_path=args.image,
@@ -60,7 +60,7 @@ def register_post(sub: argparse.ArgumentParser) -> None:
 def cmd_screenshot(args: argparse.Namespace) -> None:
     cfg = _build_app_config(args.headed)
     with BinanceService(app_config=cfg) as svc:
-        result = svc.take_futures_screenshot(
+        result = svc.symbol_screenshot(
             symbol=args.symbol,
             timeframe=args.timeframe,
             output=args.output,

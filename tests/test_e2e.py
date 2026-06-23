@@ -44,7 +44,7 @@ def test_screenshot_btc(svc: BinanceService) -> None:
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
     btc_path = SCREENSHOT_DIR / f"{BTC_SYMBOL}_{TIMEFRAME}_chart.png"
 
-    result = svc.take_futures_screenshot(
+    result = svc.symbol_screenshot(
         symbol=BTC_SYMBOL,
         timeframe=TIMEFRAME,
         output=str(btc_path),
@@ -77,7 +77,7 @@ def test_post_btc_with_image(svc: BinanceService) -> None:
         f"BTC 截图不存在，请先运行 test_screenshot_btc: {btc_image}"
     )
 
-    share_link = svc.post(
+    share_link = svc.create_post(
         base_asset=POST_ASSET,
         content=POST_CONTENT,
         image_path=str(btc_image),

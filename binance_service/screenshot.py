@@ -8,8 +8,7 @@ from tempfile import NamedTemporaryFile
 from playwright.sync_api import Browser
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-from binance_service._config import AppConfig, WindowConfig
-from binance_service._playwright import connect_browser, get_or_create_page
+from binance_service._playwright import get_or_create_page
 
 logger = logging.getLogger("screenshot")
 
@@ -48,6 +47,7 @@ def _image_merge(image1: str, image2: str, output: str):
     # 保存
     combined.save(output)
 
+
 def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Path:
     path = (
         Path(output).expanduser()
@@ -58,33 +58,7 @@ def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Pat
     return path
 
 
-def take_futures_screenshot(
-    symbol: str,
-    timeframe: str = DEFAULT_TIMEFRAME,
-    output: str | None = None,
-    app_config: AppConfig = AppConfig(window=WindowConfig(SCREENSHOT_WINDOW_WIDTH, SCREENSHOT_WINDOW_HEIGHT)),
-    browser: Browser | None = None,
-) -> Path:
-    if timeframe not in TIMEFRAME_CHOICES:
-        raise ValueError(
-            f"Invalid timeframe: {timeframe!r}. "
-            f"Choose from {TIMEFRAME_CHOICES}."
-        )
-
-    output_path = _resolve_output_path(symbol, timeframe, output)
-
-    if browser is not None:
-        _do_screenshot(browser, symbol, timeframe, output_path)
-    else:
-        with connect_browser(app_config) as b:
-            _do_screenshot(b, symbol, timeframe, output_path)
-
-    return output_path
-
-
-
-
-def _do_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: Path) -> None:
+def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: Path) -> None:
     url = f"{BASE_URL}/{symbol}"
 
     page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
