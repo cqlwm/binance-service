@@ -89,7 +89,6 @@ def cmd_postx(args: argparse.Namespace) -> None:
         share_link = svc.create_postx(
             base_asset=args.base,
             content=args.content,
-            image_path=args.image,
             quote=args.quote,
             timeframe=args.timeframe,
             debug=args.debug,
@@ -104,13 +103,12 @@ def cmd_postx(args: argparse.Namespace) -> None:
 def register_postx(sub: argparse.ArgumentParser) -> None:
     sub.add_argument("--base", required=True, help="交易对基础资产，如 DOGE")
     sub.add_argument("--content", required=True, help="帖子正文内容")
-    sub.add_argument("--image", default=None, help="可选，本地图片路径（不传则自动截图）")
     sub.add_argument("--quote", default="USDT", help="报价币，默认 USDT（用于拼接交易对 symbol）")
     sub.add_argument(
         "--timeframe",
         choices=("5m", "15m", "1h", "4h", "1d", "1w"),
         default="1h",
-        help="K 线时间周期，默认 1h（仅自动截图时生效）",
+        help="K 线时间周期，默认 1h",
     )
     sub.add_argument("--debug", action="store_true", help="启用调试截图")
     sub.set_defaults(func=cmd_postx)
