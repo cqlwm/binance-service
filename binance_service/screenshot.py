@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from PIL import Image
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, gettempdir as _gettempdir
 
 from playwright.sync_api import Browser
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
@@ -52,13 +52,15 @@ def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Pat
     path = (
         Path(output).expanduser()
         if output
-        else Path.cwd() / f"{symbol}_{timeframe}_chart.png"
+        else Path(_gettempdir()) / f"{symbol}_{timeframe}_chart.png"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: Path) -> None:
+def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: str | None) -> Path:
+    output_path: Path = _resolve_output_path(symbol, timeframe, output_path)
+
     url = f"{BASE_URL}/{symbol}"
 
     page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
@@ -88,6 +90,7 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
             _image_merge(f1.name, f2.name, output_path.as_posix())
 
         logger.info("Screenshot saved: %s", output_path)
+        return output_path
 
     except PlaywrightTimeout as exc:
         raise RuntimeError(

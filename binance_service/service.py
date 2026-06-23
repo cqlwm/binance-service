@@ -11,7 +11,6 @@ from binance_service.poster import create_post
 from binance_service.screenshot import symbol_screenshot
 from binance_service.screenshot import TIMEFRAME_CHOICES
 from binance_service.screenshot import DEFAULT_TIMEFRAME
-from binance_service.screenshot import _resolve_output_path
 
 logger = logging.getLogger("service")
 
@@ -86,6 +85,29 @@ class BinanceService:
             debug=debug,
         )
 
+    def create_postx(
+        self,
+        base_asset: str,
+        content: str,
+        quote: str = "USDT",
+        timeframe: str = "1h",
+        debug: bool = False,
+    ) -> str | None:
+        """截图 + 发帖组合操作。
+
+        如果未提供 image_path，先截取 K 线图再发帖。
+        quote 为报价币（如 USDT、USDC），用于拼接交易对 symbol。
+        """
+        screenshot_path = self.symbol_screenshot(symbol=f"{base_asset}{quote}", timeframe=timeframe)
+        image_path = screenshot_path.as_posix()
+
+        return self.create_post(
+            base_asset=base_asset,
+            content=content,
+            image_path=image_path,
+            debug=debug,
+        )
+
     def symbol_screenshot(
         self,
         symbol: str,
@@ -102,6 +124,4 @@ class BinanceService:
                 f"Invalid timeframe: {timeframe!r}. "
                 f"Choose from {TIMEFRAME_CHOICES}."
             )
-        output_path = _resolve_output_path(symbol, timeframe, output)
-        symbol_screenshot(self._browser_instance, symbol, timeframe, output_path)
-        return output_path
+        return symbol_screenshot(self._browser_instance, symbol, timeframe, output)

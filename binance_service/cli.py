@@ -80,6 +80,42 @@ def register_screenshot(sub: argparse.ArgumentParser) -> None:
     sub.set_defaults(func=cmd_screenshot)
 
 
+# ── postx ────────────────────────────────────────────────────
+
+
+def cmd_postx(args: argparse.Namespace) -> None:
+    cfg = _build_app_config(args.headed)
+    with BinanceService(app_config=cfg) as svc:
+        share_link = svc.create_postx(
+            base_asset=args.base,
+            content=args.content,
+            image_path=args.image,
+            quote=args.quote,
+            timeframe=args.timeframe,
+            debug=args.debug,
+        )
+    if share_link:
+        print(f"✅ 帖子发布成功: {share_link}")
+    else:
+        print("❌ 发帖失败，未获取到 shareLink", file=sys.stderr)
+        sys.exit(1)
+
+
+def register_postx(sub: argparse.ArgumentParser) -> None:
+    sub.add_argument("--base", required=True, help="交易对基础资产，如 DOGE")
+    sub.add_argument("--content", required=True, help="帖子正文内容")
+    sub.add_argument("--image", default=None, help="可选，本地图片路径（不传则自动截图）")
+    sub.add_argument("--quote", default="USDT", help="报价币，默认 USDT（用于拼接交易对 symbol）")
+    sub.add_argument(
+        "--timeframe",
+        choices=("5m", "15m", "1h", "4h", "1d", "1w"),
+        default="1h",
+        help="K 线时间周期，默认 1h（仅自动截图时生效）",
+    )
+    sub.add_argument("--debug", action="store_true", help="启用调试截图")
+    sub.set_defaults(func=cmd_postx)
+
+
 # ── save-storage ─────────────────────────────────────────────
 
 
@@ -111,6 +147,7 @@ def main() -> None:
 
     register_post(sub.add_parser("post", help="发布 Binance Square 帖子"))
     register_screenshot(sub.add_parser("screenshot", help="截取合约 K 线图"))
+    register_postx(sub.add_parser("postx", help="截图 + 发帖组合操作"))
     register_save_storage(sub.add_parser("save-storage", help="导出 Chrome 登录态供 headless 复用"))
 
     args = parser.parse_args()

@@ -136,7 +136,6 @@ def _paste_image(page: Page, image_path: str) -> None:
     else:
         logger.warning("Image upload did not complete within poll limit")
 
-
 def _input_trade_widget(page: Page, base_asset: str) -> None:
     trade_widget_list_selector = ".bg-CardBg .text-PrimaryText"
     try:
@@ -215,7 +214,6 @@ def create_post(
     _input_content(page, content)
     if debug:
         _debug_screenshot(page, "04_after_input_content")
-
     if image_path:
         img_file = Path(image_path)
         if not img_file.exists():
