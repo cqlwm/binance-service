@@ -13,7 +13,6 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import AppConfig
 from binance_service._playwright import connect_browser
-from binance_service._playwright import ensure_logged_in
 from binance_service._playwright import get_or_create_page
 
 logger = logging.getLogger("poster")
@@ -218,7 +217,6 @@ def _post_on_browser(
     debug: bool = False,
 ) -> str | None:
     page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
-    ensure_logged_in(page)
 
     if debug:
         _debug_screenshot(page, "01_after_login")
@@ -257,36 +255,3 @@ def _post_on_browser(
         _debug_screenshot(page, "07_after_send")
 
     return share_link
-
-
-
-def main() -> None:
-    import argparse
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s UTC %(levelname)s %(module)s.%(funcName)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    parser = argparse.ArgumentParser(description="发布 Binance Square 帖子")
-    parser.add_argument("--base", required=True, help="交易对基础资产，如 DOGE")
-    parser.add_argument("--content", required=True, help="帖子正文内容")
-    parser.add_argument("--image", default=None, help="可选，本地图片路径")
-    parser.add_argument(
-        "--headed",
-        action="store_true",
-        help="以有头模式启动 Chrome（显示 GUI）",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="启用调试模式，每一步都截图保存到 ~/.debug_chrome/screenshots/",
-    )
-    args = parser.parse_args()
-    cfg = AppConfig(headless=not args.headed)
-    post(args.base, args.content, args.image, app_config=cfg, debug=args.debug)
-
-
-if __name__ == "__main__":
-    main()

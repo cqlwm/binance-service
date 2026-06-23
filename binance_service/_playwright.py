@@ -191,10 +191,3 @@ def get_or_create_page(browser: Browser, target_url: str, timeout: int) -> Page:
     logger.info("Opened new tab: %s", page.url)
     return page
 
-
-def ensure_logged_in(page: Page, login_url_indicator: str = "/login") -> None:
-    if login_url_indicator in page.url:
-        raise RuntimeError(
-            f"Not logged in (URL contains '{login_url_indicator}'). "
-            "Please log in first in headed mode."
-        )
