@@ -65,18 +65,3 @@ def ensure_cdp_chrome_running(config: AppConfig) -> None:
         f"{CDP_RETRY_COUNT * CDP_RETRY_INTERVAL}s. "
         "Please fully exit all Chrome processes and try again."
     )
-
-
-def check_user_data_dir_available(config: AppConfig) -> None:
-    """Raise if the user data dir is locked by another Chrome instance."""
-    if not is_cdp_ready(config):
-        return
-
-    msg = (
-        f"User data dir is locked by a running Chrome instance on {config.chrome.debug_url}.\n"
-        f"  User data dir: {config.chrome.user_data_dir}\n\n"
-        "  Headless mode cannot share the same user data dir with headed Chrome.\n"
-        "  Please fully quit the existing Chrome process and retry.\n"
-        f"  You can run: lsof -ti :{config.chrome.debug_port} | xargs kill\n"
-    )
-    raise RuntimeError(msg)

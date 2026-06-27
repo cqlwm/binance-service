@@ -165,16 +165,13 @@ uv run binance-save-storage [--url <页面URL>]
 # Chrome 可执行文件路径
 CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 
-# Headed 模式用户数据目录
-USER_DATA_DIR=~/.debug_chrome/1/user-data
-
-# Headless 模式用户数据目录（与 headed 模式隔离，避免锁冲突）
-HEADLESS_USER_DATA_DIR=~/.debug_chrome/1/headless-user-data
-
-# 登录态存储路径
+# 登录态存储路径（必需，用于恢复浏览器登录会话）
 STORAGE_STATE_PATH=~/.debug_chrome/1/storage_state.json
 
-# CDP 调试地址和端口
+# save-storage 命令使用的 Chrome 用户数据目录
+USER_DATA_DIR=~/.debug_chrome/1/user-data
+
+# save-storage 命令使用的 CDP 调试地址和端口
 DEBUG_ADDRESS=127.0.0.1
 DEBUG_PORT=18800
 ```

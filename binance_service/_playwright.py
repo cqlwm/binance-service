@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
 from playwright.sync_api import Browser
+from playwright.sync_api import BrowserContext
 from playwright.sync_api import Page, ViewportSize
 from playwright.sync_api import sync_playwright
 
@@ -18,36 +19,14 @@ logger = logging.getLogger("playwright")
 
 
 @contextmanager
-def connect_browser(config: AppConfig) -> Iterator[Browser]:
-    if config.headless:
-        with _launch_headless_browser(config) as browser:
-            yield browser
-    else:
-        with _connect_cdp_browser(config) as browser:
-            yield browser
+def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
+    """Launch Chrome via Playwright and create a context with restored login state.
 
-
-@contextmanager
-def _connect_cdp_browser(config: AppConfig) -> Iterator[Browser]:
-    """Connect to an existing Chrome instance via CDP (headed mode)."""
-    ensure_cdp_chrome_running(config=config)
-    with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(config.chrome.debug_url)
-        try:
-            yield browser
-        finally:
-            browser.close()
-
-
-@contextmanager
-def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
-    """Launch Chrome via Playwright's persistent context (headless mode).
-
-    Uses a separate user data dir to avoid Singleton-lock conflicts with
-    a headed Chrome instance that may be running on the same profile.
+    Both headless and headed modes use the same path:
+    ``pw.chromium.launch()`` → ``browser.new_context()``.
     Login state is restored from a previously saved storage-state file.
     On successful completion, the (potentially refreshed) storage state
-    is written back so subsequent headless sessions use the latest session.
+    is written back so subsequent sessions use the latest session.
     """
     chrome_path = Path(config.chrome.bin_path)
     if not chrome_path.exists():
@@ -58,24 +37,22 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
     vp: ViewportSize = {"width": w, "height": h}
 
     logger.info(
-        "Launching headless Chrome (user_data_dir=%s, window=%dx%d)",
-        config.chrome.headless_user_data_dir, w, h,
+        "Launching Chrome (headless=%s, window=%dx%d)",
+        config.headless, w, h,
     )
 
     with sync_playwright() as pw:
-        context = pw.chromium.launch_persistent_context(
-            user_data_dir=config.chrome.headless_user_data_dir,
-            headless=True,
+        browser = pw.chromium.launch(
+            headless=config.headless,
             executable_path=config.chrome.bin_path,
             args=["--no-first-run", "--no-default-browser-check"],
+        )
+        context = browser.new_context(
             viewport=vp,
             device_scale_factor=2,
         )
         _restore_storage_state(context, config.chrome.storage_state_path)
 
-
-        browser = context.browser
-        assert browser is not None, "launch_persistent_context did not return a Browser"
         error_occurred = False
         try:
             yield browser
@@ -88,7 +65,7 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
             context.close()
 
 
-def _restore_storage_state(context, storage_state_path: str) -> None:
+def _restore_storage_state(context: BrowserContext, storage_state_path: str) -> None:
     """Load previously saved cookies / localStorage into the context."""
     path = Path(storage_state_path)
     if not path.exists():
@@ -97,14 +74,12 @@ def _restore_storage_state(context, storage_state_path: str) -> None:
 
     try:
         context.set_storage_state(path)
-        logger.info(
-            "Restored localStorage for %d origins", len(origins),
-        )
+        logger.info("Restored storage state from %s", path)
     except Exception:
         logger.exception("Failed to restore storage state from %s", path)
 
 
-def _save_storage_state(context, storage_state_path: str) -> None:
+def _save_storage_state(context: BrowserContext, storage_state_path: str) -> None:
     """Dump the current storage state (cookies + localStorage) to a JSON file.
 
     Creates a backup of the previous file before overwriting, so a bad
@@ -127,7 +102,7 @@ def _save_storage_state(context, storage_state_path: str) -> None:
             "Saved storage state (%d cookies, %d origins) to %s",
             len(state.get("cookies", [])),
             len(state.get("origins", [])),
-            path
+            path,
         )
     except Exception:
         logger.exception("Failed to save storage state to %s", path)
@@ -135,17 +110,20 @@ def _save_storage_state(context, storage_state_path: str) -> None:
 
 
 def save_storage_state(config: AppConfig, target_url: str) -> None:
-    """Connect to headed Chrome, navigate to *target_url*, and dump storage state.
+    """Connect to headed Chrome via CDP, navigate to *target_url*, and dump storage state.
 
     Run this *after* logging in via headed mode so that headless mode can
     restore the login session from the saved file.
     """
-    with _connect_cdp_browser(config) as browser:
+    ensure_cdp_chrome_running(config=config)
+    with sync_playwright() as pw:
+        browser = pw.chromium.connect_over_cdp(config.chrome.debug_url)
         page = get_or_create_page(browser, target_url)
         if target_url:
             page.goto(target_url, wait_until="load")
             logger.info("Navigated to %s for storage state capture", target_url)
 
+        context = browser.contexts[0]
         _save_storage_state(context, config.chrome.storage_state_path)
 
 
@@ -162,4 +140,3 @@ def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = 
     page.goto(target_url, wait_until="load", timeout=timeout)
     logger.info("Opened new tab: %s", page.url)
     return page
-

@@ -23,4 +23,11 @@ package = true
 
 [tool.pyright]
 typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
 ignore = ["binance_service/type_wrapper/*_wrapper.py"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411",
+]

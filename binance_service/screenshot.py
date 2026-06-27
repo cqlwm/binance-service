@@ -59,7 +59,7 @@ def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Pat
 
 
 def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: str | None) -> Path:
-    output_path: Path = _resolve_output_path(symbol, timeframe, output_path)
+    resolved_path = _resolve_output_path(symbol, timeframe, output_path)
 
     url = f"{BASE_URL}/{symbol}"
 
@@ -87,10 +87,10 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
             page.locator(CHART_UI_SELECTOR).screenshot(path=str(f2.name), scale="device")
-            _image_merge(f1.name, f2.name, output_path.as_posix())
+            _image_merge(f1.name, f2.name, resolved_path.as_posix())
 
-        logger.info("Screenshot saved: %s", output_path)
-        return output_path
+        logger.info("Screenshot saved: %s", resolved_path)
+        return resolved_path
 
     except PlaywrightTimeout as exc:
         raise RuntimeError(

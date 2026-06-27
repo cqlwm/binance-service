@@ -127,6 +127,7 @@ def _paste_image(page: Page, image_path: str) -> None:
     )
 
     img = page.wait_for_selector(".short-editor-content img", timeout=30000)
+    assert img is not None, "Image element not found in editor"
 
     for _ in range(IMAGE_UPLOAD_POLL_COUNT):
         src = img.get_attribute("src") or ""
