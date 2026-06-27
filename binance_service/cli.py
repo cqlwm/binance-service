@@ -129,11 +129,6 @@ def register_save_storage(sub: argparse.ArgumentParser) -> None:
         default="https://www.binance.com/zh-CN/square",
         help="登录后要导航到的页面，默认 Binance Square",
     )
-    sub.add_argument(
-        "--user_data_dir",
-        default="/Users/li/.debug_chrome/1/user-data",
-        help="本地user-data目录",
-    )
     sub.set_defaults(func=cmd_save_storage)
 
 
