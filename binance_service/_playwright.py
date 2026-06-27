@@ -73,6 +73,7 @@ def _launch_headless_browser(config: AppConfig) -> Iterator[Browser]:
         )
         _restore_storage_state(context, config.chrome.storage_state_path)
 
+
         browser = context.browser
         assert browser is not None, "launch_persistent_context did not return a Browser"
         error_occurred = False
@@ -95,36 +96,7 @@ def _restore_storage_state(context, storage_state_path: str) -> None:
         return
 
     try:
-        with open(path) as f:
-            state = json.load(f)
-
-        # 恢复 cookies
-        cookies = state.get("cookies", [])
-        context.add_cookies(cookies)
-        logger.info("Restored %d cookies from %s", len(cookies), path)
-
-        # 恢复 localStorage（每个 origin 需开一个页面写入）
-        origins = state.get("origins", [])
-        for entry in origins:
-            origin = entry["origin"]
-            ls_items = entry.get("localStorage", [])
-            if not ls_items:
-                continue
-            page = context.new_page()
-            try:
-                page.goto(origin, wait_until="domcontentloaded")
-                for item in ls_items:
-                    page.evaluate(
-                        "({ name, value }) => localStorage.setItem(name, value)",
-                        {"name": item["name"], "value": item["value"]},
-                    )
-                logger.debug(
-                    "Restored %d localStorage items for %s", len(ls_items), origin,
-                )
-            except Exception:
-                logger.warning("Failed to restore localStorage for %s", origin)
-            finally:
-                page.close()
+        context.set_storage_state(path)
         logger.info(
             "Restored localStorage for %d origins", len(origins),
         )
