@@ -5,7 +5,7 @@ import logging
 import sys
 from binance_service import BinanceService
 from binance_service._config import AppConfig, WindowConfig
-from binance_service._playwright import save_storage_state
+from binance_service.storage_state import save_storage_state_from_cdp
 
 logger = logging.getLogger("cli")
 
@@ -119,7 +119,7 @@ def register_postx(sub: argparse.ArgumentParser) -> None:
 
 def cmd_save_storage(args: argparse.Namespace) -> None:
     cfg = AppConfig()
-    save_storage_state(cfg, target_url=args.url)
+    save_storage_state_from_cdp(cfg, target_url=args.url)
     print(f"✅ 登录态已保存到 {cfg.chrome.storage_state_path}")
 
 
