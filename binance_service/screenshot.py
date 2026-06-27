@@ -64,7 +64,7 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
     url = f"{BASE_URL}/{symbol}"
 
     page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
-    page.set_viewport_size({"width": 500, "height": SCREENSHOT_WINDOW_HEIGHT})
+    page.set_viewport_size({"width": SCREENSHOT_WINDOW_WIDTH, "height": SCREENSHOT_WINDOW_HEIGHT})
 
     try:
         page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
