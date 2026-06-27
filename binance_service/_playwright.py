@@ -123,33 +123,33 @@ def _save_storage_state(context, storage_state_path: str) -> None:
         with open(path, "w") as f:
             json.dump(state, f)
 
-        cookie_count = len(state.get("cookies", []))
         logger.info(
             "Saved storage state (%d cookies, %d origins) to %s",
-            cookie_count, len(state.get("origins", [])), path,
+            len(state.get("cookies", [])),
+            len(state.get("origins", [])),
+            path
         )
     except Exception:
         logger.exception("Failed to save storage state to %s", path)
+        raise
 
 
-def save_storage_state(config: AppConfig, target_url: str | None = None) -> None:
+def save_storage_state(config: AppConfig, target_url: str) -> None:
     """Connect to headed Chrome, navigate to *target_url*, and dump storage state.
 
     Run this *after* logging in via headed mode so that headless mode can
     restore the login session from the saved file.
     """
     with _connect_cdp_browser(config) as browser:
-        context = browser.contexts[0]
-        page = context.new_page()
+        page = get_or_create_page(browser, target_url)
         if target_url:
             page.goto(target_url, wait_until="load")
             logger.info("Navigated to %s for storage state capture", target_url)
 
         _save_storage_state(context, config.chrome.storage_state_path)
-        page.close()
 
 
-def get_or_create_page(browser: Browser, target_url: str, timeout: int) -> Page:
+def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = None) -> Page:
     for context in browser.contexts:
         for page in context.pages:
             if page.url == target_url:
