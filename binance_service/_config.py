@@ -10,7 +10,6 @@ logger = logging.getLogger("_config.py")
 
 # 配置根目录
 CONFIG_DIR = Path.home() / ".binance-service"
-STORAGE_STATE_PATH = (CONFIG_DIR / "storage_state.json")
 
 _env_path = CONFIG_DIR / ".env"
 if not dotenv.load_dotenv(_env_path):
@@ -46,7 +45,7 @@ class ChromeConfig:
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             ),
             user_data_dir=os.environ["USER_DATA_DIR"],
-            storage_state_path=os.getenv("STORAGE_STATE_PATH", STORAGE_STATE_PATH.as_posix()),
+            storage_state_path=os.getenv("STORAGE_STATE_PATH", (CONFIG_DIR / "storage_state.json").as_posix()),
             debug_address=os.getenv("DEBUG_ADDRESS", "127.0.0.1"),
             debug_port=int(os.getenv("DEBUG_PORT", "18800")),
         )
