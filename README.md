@@ -6,39 +6,55 @@
 
 | 命令 | 说明 |
 |------|------|
-| `binance-post` | 在币安广场（Binance Square）发布帖子，支持图文、行情卡片 |
-| `binance-screenshot` | 截取合约页（Futures）TradingView K 线图 |
-| `binance-save-storage` | 导出 Chrome 登录态，供 Headless 模式复用 |
+| `binance post` | 在币安广场（Binance Square）发布帖子，支持图文、行情卡片 |
+| `binance screenshot` | 截取合约页（Futures）TradingView K 线图 |
+| `binance postx` | 截图 + 发帖组合操作 |
+| `binance save-storage` | 导出 Chrome 登录态，供 Headless 模式复用 |
 
 ## 工作原理
 
-脚本通过 **Chrome DevTools Protocol（CDP）** 连接到 Chrome 浏览器，在现有窗口中执行页面操作。无需手动登录或管理 Cookie。
+脚本通过 **Playwright** 启动 Chrome 实例，自动恢复之前保存的登录态。登录态管理分为两步：
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  CLI (binance-post / binance-screenshot)                    │
-│    │                                                        │
-│    ▼                                                        │
-│  Playwright connect_over_cdp(127.0.0.1:18800)               │
-│    │                                                        │
-│    ▼                                                        │
-│  Chrome (--remote-debugging-port=18800)                     │
-│    │                                                        │
-│    ▼                                                        │
-│  Binance.com (复用本地登录态，无需 API Key)                    │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  步骤一：导出登录态（save-storage，仅首次/登录态过期时需要）       │
+│                                                                    │
+│  CLI (binance save-storage)                                        │
+│    │                                                               │
+│    ▼                                                               │
+│  CDP 连接已有 Chrome ← 用户已手动登录 Binance                      │
+│    │                                                               │
+│    ▼                                                               │
+│  导出 cookies + localStorage → storage_state.json                  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  步骤二：自动化操作（post / screenshot / postx）                  │
+│                                                                    │
+│  CLI (binance post / screenshot / postx)                           │
+│    │                                                               │
+│    ▼                                                               │
+│  Playwright launch Chrome (headless/headed)                        │
+│    │                                                               │
+│    ▼                                                               │
+│  new_context(storage_state=storage_state.json) ← 恢复登录态        │
+│    │                                                               │
+│    ▼                                                               │
+│  执行操作 → 写回 storage_state.json（更新 session）                │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### 两种运行模式
+### 关键设计
 
-- **Headless 模式**（默认）：Chrome 在后台运行，不弹出 GUI 窗口，适合定时任务、CI/CD 或服务器环境。**推荐生产环境使用**。
-- **Headed 模式**（`--headed`）：连接本地已有的 Chrome 窗口，可见操作过程，适合调试和手动确认。
+- **`save-storage` 是唯一需要用户手动登录的命令**：通过 CDP 连接用户已有的 Chrome，用户需事先在 Chrome 中登录币安
+- **其他命令完全由 Playwright 管理**：Playwright 自动启动/关闭 Chrome，无需依赖外部 Chrome 进程，无需固定的 CDP 端口
+- **登录态自动持久化**：每次操作结束时自动写回 `storage_state.json`（含 `.bak` 备份），session 刷新后不会丢失
 
 ## 环境要求
 
 - Python >= 3.13
 - macOS，已安装 Google Chrome
-- Chrome 中已登录币安账号
+- Chrome 中已登录币安账号（仅首次导出登录态时需要）
 
 ## 安装
 
@@ -52,46 +68,50 @@ uv run playwright install chromium
 
 ## 快速开始
 
-### 1. 首次使用：导出登录态（Headless 模式需要）
-
-如果使用 Headless 模式，需要先通过 Headed 模式导出登录态：
+### 1. 首次使用：导出登录态
 
 ```bash
 # 确保 Chrome 已登录币安账号
 # 导出登录态（cookies + localStorage）
-uv run binance-save-storage
+uv run binance save-storage
 ```
 
-登录态会保存到 `~/.debug_chrome/1/storage_state.json`，Headless 模式会自动加载。
+登录态会保存到 `~/.debug_chrome/1/storage_state.json`，后续所有命令会自动加载。
 
 > **注意**：登录态过期后需要重新导出。币安登录态通常有效期为数天到数周。
 
 ### 2. 发布帖子
 
 ```bash
-# Headless 模式（默认，无需额外参数）
-uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
+# Headless 模式（默认，后台运行）
+uv run binance post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
 
 # 有头模式（弹出 Chrome 窗口，调试用）
-uv run binance-post --base DOGE --content "UP UP UP" --image /path/to/image.jpg --headed
+uv run binance post --base DOGE --content "UP UP UP" --headed
 ```
 
 ### 3. 截取 K 线图
 
 ```bash
-# Headless 模式（默认，无需额外参数）
-uv run binance-screenshot --symbol BTCUSDC
+# Headless 模式（默认）
+uv run binance screenshot --symbol BTCUSDC
 
 # 指定周期和输出路径
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
+uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
+```
+
+### 4. 截图 + 发帖组合
+
+```bash
+uv run binance postx --base BTC --content "BTC looks bullish!"
 ```
 
 ## CLI 参考
 
-### binance-post — 发布帖子
+### binance post — 发布帖子
 
 ```bash
-uv run binance-post --base <资产> --content "<正文>" [选项]
+uv run binance post --base <资产> --content "<正文>" [选项]
 ```
 
 | 参数 | 必填 | 说明 |
@@ -106,21 +126,21 @@ uv run binance-post --base <资产> --content "<正文>" [选项]
 
 ```bash
 # 纯文字帖子
-uv run binance-post --base DOGE --content "DOGE to the moon!"
+uv run binance post --base DOGE --content "DOGE to the moon!"
 
 # 图文帖子
-uv run binance-post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png
+uv run binance post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png
 
 # 调试模式（排查问题时使用）
-uv run binance-post --base DOGE --content "test" --image test.png --debug
+uv run binance post --base DOGE --content "test" --image test.png --debug
 ```
 
-### binance-screenshot — 合约页截图
+### binance screenshot — 合约页截图
 
 截取合约页的 TradingView K 线图（合并 switch 区域和 chart 区域为一张完整图片）。
 
 ```bash
-uv run binance-screenshot --symbol <交易对> [选项]
+uv run binance screenshot --symbol <交易对> [选项]
 ```
 
 | 参数 | 必填 | 说明 |
@@ -134,21 +154,38 @@ uv run binance-screenshot --symbol <交易对> [选项]
 
 ```bash
 # 默认 1h 周期
-uv run binance-screenshot --symbol BTCUSDC
+uv run binance screenshot --symbol BTCUSDC
 
 # 日线图
-uv run binance-screenshot --symbol BTCUSDC --timeframe 1d
+uv run binance screenshot --symbol BTCUSDC --timeframe 1d
 
 # 指定输出路径
-uv run binance-screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
+uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
 ```
 
-### binance-save-storage — 导出登录态
+### binance postx — 截图 + 发帖组合
 
-从 Headed Chrome 导出 cookies 和 localStorage，供 Headless 模式复用。
+先截取 K 线图，再附带截图发布帖子。
 
 ```bash
-uv run binance-save-storage [--url <页面URL>]
+uv run binance postx --base <资产> --content "<正文>" [选项]
+```
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--base` | 是 | 交易对基础资产，如 `DOGE`、`BTC` |
+| `--content` | 是 | 帖子正文 |
+| `--quote` | 否 | 报价币，默认 `USDT`（用于拼接交易对 symbol） |
+| `--timeframe` | 否 | K 线周期，默认 `1h` |
+| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
+| `--debug` | 否 | 启用调试模式 |
+
+### binance save-storage — 导出登录态
+
+通过 CDP 连接已有 Chrome，导出 cookies 和 localStorage，供自动化操作复用。
+
+```bash
+uv run binance save-storage [--url <页面URL>]
 ```
 
 | 参数 | 必填 | 说明 |
@@ -159,7 +196,7 @@ uv run binance-save-storage [--url <页面URL>]
 
 ## 配置
 
-配置文件位于 `~/.news-service/.env`，可自定义 Chrome 路径和调试端口：
+配置文件位于 `~/.binance-service/.env`，可自定义 Chrome 路径和相关配置：
 
 ```env
 # Chrome 可执行文件路径
@@ -183,13 +220,17 @@ DEBUG_PORT=18800
 ```
 binance-service/
 ├── binance_service/
-│   ├── __init__.py         # 公开 API（AppConfig, ChromeConfig, post, take_futures_screenshot）
-│   ├── _config.py          # 配置管理（从 ~/.binance-service/.env 加载，dataclass 配置模型）
-│   ├── _chrome.py          # Chrome 进程管理（CDP 检测/启动）
-│   ├── _playwright.py      # Playwright 连接管理（CDP 连接 / Headless 启动 / 登录态恢复）
-│   ├── poster.py           # 发帖业务逻辑（输入内容、图片粘贴、行情卡片、发送）
-│   ├── screenshot.py       # 截图业务逻辑（导航、切换周期、合并截图）
-│   └── save_storage.py     # 登录态导出 CLI
+│   ├── __init__.py         # 公开 API
+│   ├── _config.py          # 配置管理（从 ~/.binance-service/.env 加载）
+│   ├── _chrome.py          # CDP Chrome 进程管理（仅 save-storage 使用）
+│   ├── _playwright.py      # Playwright 浏览器生命周期管理
+│   ├── storage_state.py    # 登录态序列化/反序列化（restore / save / CDP 导出）
+│   ├── poster.py           # 发帖业务逻辑
+│   ├── screenshot.py       # 截图业务逻辑
+│   ├── cli.py              # CLI 入口
+│   └── service.py          # BinanceService 封装
+├── tests/
+│   └── test_e2e.py         # 端到端集成测试
 ├── pyproject.toml          # 项目配置与依赖
 ├── uv.lock                 # 依赖锁定文件
 └── README.md
@@ -200,23 +241,6 @@ binance-service/
 **Q: 截图模糊或只有黑色？**
 
 截图前 Chrome 窗口被其他操作打断会导致渲染异常。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `CHART_INITIAL_WAIT_MS` 和 `TIMEFRAME_REDRAW_WAIT_MS` 的值。
-
-**Q: 报错 `CDP port not ready`？**
-
-Chrome 调试端口未就绪。完全退出所有 Chrome 进程后重试：
-
-```bash
-pkill -f "Google Chrome"
-uv run binance-screenshot --symbol BTCUSDC
-```
-
-**Q: Headless 模式提示用户数据目录被锁定？**
-
-Headed 模式和 Headless 模式使用不同的用户数据目录（`user-data` vs `headless-user-data`），正常情况下不会冲突。如果仍有锁冲突，检查是否有残留 Chrome 进程：
-
-```bash
-lsof -ti :18800 | xargs kill
-```
 
 **Q: 帖子发送按钮一直灰色不可点击？**
 
@@ -229,16 +253,16 @@ lsof -ti :18800 | xargs kill
 使用 `--debug` 模式，每一步都会截图保存到 `~/.debug_chrome/screenshots/`：
 
 ```bash
-uv run binance-post --base DOGE --content "test" --debug
+uv run binance post --base DOGE --content "test" --debug
 ```
 
 **Q: 登录态过期了怎么办？**
 
-重新运行 `binance-save-storage` 导出最新登录态：
+重新运行 `binance save-storage` 导出最新登录态：
 
 ```bash
 # 确保 Chrome 中已重新登录币安
-uv run binance-save-storage
+uv run binance save-storage
 ```
 
 **Q: 支持 Windows / Linux 吗？**
@@ -255,7 +279,7 @@ uv sync
 uv run ruff format binance_service/
 
 # 类型检查
-uv run mypy binance_service/
+uv run pyright binance_service/
 
 # 运行测试
 uv run pytest tests/
