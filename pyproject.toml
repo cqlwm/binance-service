@@ -18,6 +18,9 @@ binance = "binance_service.cli:main"
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["binance_service"]
+
 [tool.uv]
 package = true
 
