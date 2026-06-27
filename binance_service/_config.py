@@ -10,6 +10,8 @@ logger = logging.getLogger("_config.py")
 
 # 配置根目录
 CONFIG_DIR = Path.home() / ".binance-service"
+STORAGE_STATE_PATH = (CONFIG_DIR / "storage_state.json")
+
 _env_path = CONFIG_DIR / ".env"
 if not dotenv.load_dotenv(_env_path):
     logger.warning("Failed to load environment variables from %s", _env_path)
@@ -33,7 +35,6 @@ class ChromeConfig:
 
     @classmethod
     def default(cls) -> ChromeConfig:
-        chrome_data_dir = Path.home() / ".debug_chrome" / "1"
         if not os.getenv("STORAGE_STATE_PATH"):
             logger.warning(
                 "STORAGE_STATE_PATH environment variable is not configured"
@@ -44,14 +45,8 @@ class ChromeConfig:
                 "CHROME_BIN",
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             ),
-            user_data_dir=os.getenv(
-                "USER_DATA_DIR",
-                (chrome_data_dir / "user-data").as_posix(),
-            ),
-            storage_state_path=os.getenv(
-                "STORAGE_STATE_PATH",
-                (chrome_data_dir / "storage_state.json").as_posix(),
-            ),
+            user_data_dir=os.environ["USER_DATA_DIR"],
+            storage_state_path=os.getenv("STORAGE_STATE_PATH", STORAGE_STATE_PATH.as_posix()),
             debug_address=os.getenv("DEBUG_ADDRESS", "127.0.0.1"),
             debug_port=int(os.getenv("DEBUG_PORT", "18800")),
         )
