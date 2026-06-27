@@ -18,8 +18,6 @@ if not dotenv.load_dotenv(_env_path):
 
 @dataclass(frozen=True)
 class ChromeConfig:
-    bin_path: str
-    user_data_dir: str
     storage_state_path: str
     debug_address: str
     debug_port: int
@@ -40,11 +38,6 @@ class ChromeConfig:
             )
 
         return ChromeConfig(
-            bin_path=os.getenv(
-                "CHROME_BIN",
-                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            ),
-            user_data_dir=os.environ["USER_DATA_DIR"],
             storage_state_path=os.getenv("STORAGE_STATE_PATH", (CONFIG_DIR / "storage_state.json").as_posix()),
             debug_address=os.getenv("DEBUG_ADDRESS", "127.0.0.1"),
             debug_port=int(os.getenv("DEBUG_PORT", "18800")),

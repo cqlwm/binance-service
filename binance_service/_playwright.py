@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 from contextlib import contextmanager
-from pathlib import Path
 
 from playwright.sync_api import Browser
 from playwright.sync_api import Page, ViewportSize
@@ -26,10 +25,6 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
     On successful completion, the (potentially refreshed) storage state
     is written back so subsequent sessions use the latest session.
     """
-    chrome_path = Path(config.chrome.bin_path)
-    if not chrome_path.exists():
-        raise FileNotFoundError(f"Chrome not found: {chrome_path}")
-
     w = config.window.width
     h = config.window.height
     vp: ViewportSize = {"width": w, "height": h}
