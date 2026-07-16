@@ -13,7 +13,7 @@ from binance_service._config import AppConfig
 from binance_service.storage_state import restore_storage_state
 from binance_service.storage_state import save_storage_state
 
-logger = logging.getLogger("playwright")
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
