@@ -106,6 +106,79 @@ uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.p
 uv run binance postx --base BTC --content "BTC looks bullish!"
 ```
 
+## 库函数使用
+
+除了命令行工具，本项目也提供 Python 库接口供其他代码直接调用。核心封装类为 `BinanceService`，支持自动管理浏览器生命周期。
+
+### 快速示例
+
+```python
+from binance_service import BinanceService
+
+# 使用 with 语句自动管理浏览器生命周期（推荐）
+with BinanceService() as service:
+    # 1. 截图 + 发帖组合操作（PostX，最常用）
+    # 自动截取 K 线图，然后附带图片发布帖子
+    service.create_postx(
+        base_asset="BTC",
+        content="BTC 突破关键阻力位，看涨！",
+        quote="USDT",      # 可选，默认 USDT
+        timeframe="1h",    # 可选，默认 1h
+    )
+
+    # 2. 单独发布帖子
+    service.create_post(
+        base_asset="DOGE",
+        content="To the moon! 🚀",
+        image_path="/path/to/image.jpg",  # 可选
+    )
+
+    # 3. 单独截取 K 线图
+    screenshot_path = service.symbol_screenshot(
+        symbol="ETHUSDT",
+        timeframe="4h",
+        output="/tmp/eth_4h.png",  # 可选
+    )
+```
+
+### 手动管理浏览器
+
+如需多次调用不同方法，可手动打开/关闭浏览器，避免反复启动 Chrome：
+
+```python
+service = BinanceService()
+service.open()
+
+try:
+    # 多次操作共用一个浏览器实例
+    service.create_postx(base_asset="BTC", content="First post")
+    service.create_postx(base_asset="ETH", content="Second post")
+finally:
+    service.close()
+```
+
+### API 参考
+
+#### `BinanceService` 类
+
+| 方法 | 说明 |
+|------|------|
+| `create_postx(base_asset, content, quote="USDT", timeframe="1h", debug=False)` | **截图 + 发帖组合**，自动截取 K 线图并发布带图片的帖子 |
+| `create_post(base_asset, content, image_path=None, debug=False)` | 发布 Binance Square 帖子 |
+| `symbol_screenshot(symbol, timeframe="1h", output=None)` | 截取 Binance 合约 K 线图，返回截图路径 |
+
+**`create_postx` 参数说明：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `base_asset` | `str` | 是 | 基础资产，如 `BTC`、`DOGE`、`ETH` |
+| `content` | `str` | 是 | 帖子正文内容 |
+| `quote` | `str` | 否 | 报价币，默认 `USDT`，用于拼接交易对 symbol |
+| `timeframe` | `str` | 否 | K 线周期，默认 `1h`，可选值：`1m` / `5m` / `15m` / `30m` / `1h` / `2h` / `4h` / `1d` |
+| `debug` | `bool` | 否 | 启用调试模式，默认 `False` |
+
+> **注意**：使用库函数前，需先通过 `binance save-storage` 命令导出登录态。
+
 ## CLI 参考
 
 ### binance post — 发布帖子
