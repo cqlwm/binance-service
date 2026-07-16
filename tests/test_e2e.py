@@ -1,8 +1,9 @@
 """端到端集成测试：截图 BTC/USDT → 发帖看涨 BTC（附带截图图片）。
 
 前置条件：
-  1. 已通过 ``binance-save-storage`` 保存登录态
+  1. 已通过 ``binance save-storage --config config.yaml`` 保存登录态
   2. Chrome 已安装且可被 Playwright 调用
+  3. 仓库根目录存在 config.yaml（基于 config.example.yaml 修改路径）
 
 运行方式：
   uv run python -m pytest tests/test_e2e.py -v --headed  # 有头模式（可观察）
@@ -17,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from binance_service import BinanceService
+from binance_service import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +33,19 @@ TIMEFRAME = "1d"
 # 截图输出目录
 SCREENSHOT_DIR = Path.home() / ".binance-service" / "test_screenshots"
 
+# 配置文件：优先使用仓库根目录的 config.yaml，否则回退到 config.example.yaml
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_CONFIG_PATH = _PROJECT_ROOT / "config.yaml"
+if not _CONFIG_PATH.exists():
+    _CONFIG_PATH = _PROJECT_ROOT / "config.example.yaml"
+
 
 @pytest.fixture(scope="module")
 def svc() -> BinanceService:
     """模块级 fixture：整个测试模块只打开一次浏览器。"""
-    with BinanceService() as service:
+    app_config = load_config(_CONFIG_PATH)
+    # 测试环境若需要真实登录态文件，可通过 replace 覆盖 storage_state_path
+    with BinanceService(app_config=app_config) as service:
         yield service
 
 
@@ -73,9 +83,7 @@ def test_screenshot_btc(svc: BinanceService) -> None:
 def test_post_btc_with_image(svc: BinanceService) -> None:
     """发帖看涨 BTC，并附带 BTC 截图作为图片。"""
     btc_image = SCREENSHOT_DIR / f"{BTC_SYMBOL}_{TIMEFRAME}_chart.png"
-    assert btc_image.exists(), (
-        f"BTC 截图不存在，请先运行 test_screenshot_btc: {btc_image}"
-    )
+    assert btc_image.exists(), f"BTC 截图不存在，请先运行 test_screenshot_btc: {btc_image}"
 
     share_link = svc.create_post(
         base_asset=POST_ASSET,

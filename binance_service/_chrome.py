@@ -11,13 +11,13 @@ from binance_service._config import AppConfig
 
 logger = logging.getLogger("chrome")
 
-CDP_RETRY_COUNT = 20
-CDP_RETRY_INTERVAL = 0.5
+# CDP 健康检查请求超时（网络级，非运营参数）
+_CDP_HEALTH_CHECK_TIMEOUT = 1
 
 
 def is_cdp_ready(config: AppConfig) -> bool:
     try:
-        with urlopen(config.chrome.version_url, timeout=1):
+        with urlopen(config.chrome.version_url, timeout=_CDP_HEALTH_CHECK_TIMEOUT):
             return True
     except (URLError, TimeoutError, OSError):
         return False
@@ -55,13 +55,13 @@ def ensure_cdp_chrome_running(config: AppConfig) -> None:
         start_new_session=True,
     )
 
-    for _ in range(CDP_RETRY_COUNT):
+    for _ in range(config.cdp.retry_count):
         if is_cdp_ready(config):
             return
-        time.sleep(CDP_RETRY_INTERVAL)
+        time.sleep(config.cdp.retry_interval)
 
     raise RuntimeError(
         f"CDP port {config.chrome.debug_url} not ready after "
-        f"{CDP_RETRY_COUNT * CDP_RETRY_INTERVAL}s. "
+        f"{config.cdp.retry_count * config.cdp.retry_interval}s. "
         "Please fully exit all Chrome processes and try again."
     )

@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import logging
 import time
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,41 +10,16 @@ from playwright.sync_api import Browser
 from playwright.sync_api import Page
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
+from binance_service._config import PosterConfig
 from binance_service._playwright import get_or_create_page
 
 logger = logging.getLogger("poster")
 
-TARGET_URL = "https://www.binance.com/zh-CN/square"
-GOTO_TIMEOUT_MS = 60000
 
-# 输入资产标签后等待下拉列表渲染的时间
-SYMBOL_DROPDOWN_WAIT_SECONDS = 3
-# 交易 widget 搜索模式下等待列表出现的时间
-TRADE_WIDGET_SEARCH_TIMEOUT_MS = 3000
-# 交易 widget 非搜索模式下的等待时间
-TRADE_WIDGET_DEFAULT_TIMEOUT_MS = 3000
-# 发送按钮 active 状态等待超时
-SEND_BUTTON_TIMEOUT_MS = 30000
-# 发送 API 响应等待超时
-SEND_API_TIMEOUT_MS = 30000
-# 图片上传后轮询等待上传完成的最大次数
-IMAGE_UPLOAD_POLL_COUNT = 30
-# 图片上传轮询间隔
-IMAGE_UPLOAD_POLL_INTERVAL = 1.0
-
-SUPPORTED_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
-
-# 调试截图输出目录
-DEBUG_SCREENSHOT_DIR = Path(tempfile.gettempdir()) / ".debug_chrome" / "screenshots"
-
-# 发帖 API 路径
-POST_API_URL = "https://www.binance.com/bapi/composite/v5/private/pgc/content/add"
-
-
-def _debug_screenshot(page: Page, label: str) -> None:
+def _debug_screenshot(page: Page, debug_screenshot_dir: str, label: str) -> None:
     """Save a full-page screenshot for debugging, named by step label."""
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    output_dir = DEBUG_SCREENSHOT_DIR
+    output_dir = Path(debug_screenshot_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{ts}_{label}.png"
     page.screenshot(path=path.as_posix(), full_page=True)
@@ -58,12 +32,12 @@ def _focus_input_box(page: Page) -> None:
     page.click(editor)
 
 
-def _input_symbol(page: Page, base_asset: str) -> None:
+def _input_symbol(page: Page, base_asset: str, dropdown_wait_seconds: int) -> None:
     page.keyboard.type(f"${base_asset}")
     icon_boxs_selector = ".tippy-box .tippy-content .bg-cardBg"
     try:
         page.wait_for_selector(icon_boxs_selector)
-        time.sleep(SYMBOL_DROPDOWN_WAIT_SECONDS)
+        time.sleep(dropdown_wait_seconds)
         container = page.locator(icon_boxs_selector)
         children = container.locator(".text-PrimaryText").all()
         for child in children:
@@ -81,7 +55,7 @@ def _input_content(page: Page, text: str) -> None:
     page.keyboard.type(text)
 
 
-def _paste_image(page: Page, image_path: str) -> None:
+def _paste_image(page: Page, image_path: str, poll_count: int, poll_interval: float, img_timeout_ms: int) -> None:
     img_path = Path(image_path)
     if not img_path.exists():
         logger.error("Image file not found: %s", image_path)
@@ -126,21 +100,22 @@ def _paste_image(page: Page, image_path: str) -> None:
         {"base64Data": image_data, "mimeType": mime_type, "fileName": "image.jpg"},
     )
 
-    img = page.wait_for_selector(".short-editor-content img", timeout=30000)
+    img = page.wait_for_selector(".short-editor-content img", timeout=img_timeout_ms)
     assert img is not None, "Image element not found in editor"
 
-    for _ in range(IMAGE_UPLOAD_POLL_COUNT):
+    for _ in range(poll_count):
         src = img.get_attribute("src") or ""
         if src.startswith("/bapi/fe/resource/image"):
             break
-        page.wait_for_timeout(int(IMAGE_UPLOAD_POLL_INTERVAL * 1000))
+        page.wait_for_timeout(int(poll_interval * 1000))
     else:
         logger.warning("Image upload did not complete within poll limit")
 
-def _input_trade_widget(page: Page, base_asset: str) -> None:
+
+def _input_trade_widget(page: Page, base_asset: str, default_timeout_ms: int) -> None:
     trade_widget_list_selector = ".bg-CardBg .text-PrimaryText"
     try:
-        page.wait_for_selector(trade_widget_list_selector, timeout=TRADE_WIDGET_DEFAULT_TIMEOUT_MS)
+        page.wait_for_selector(trade_widget_list_selector, timeout=default_timeout_ms)
     except PlaywrightTimeout:
         logger.warning("Trade widget list not found, attempting search mode")
 
@@ -160,7 +135,7 @@ def _input_trade_widget(page: Page, base_asset: str) -> None:
             break
 
 
-def _click_send_button(page: Page) -> str | None:
+def _click_send_button(page: Page, post_api_url: str, button_timeout_ms: int, api_timeout_ms: int) -> str | None:
     selector = ".short-editor-inner button"
     send_button = page.locator(selector, has_text="发文")
     try:
@@ -173,11 +148,11 @@ def _click_send_button(page: Page) -> str | None:
             }
             """,
             arg=selector,
-            timeout=SEND_BUTTON_TIMEOUT_MS
+            timeout=button_timeout_ms,
         )
         with page.expect_response(
-            lambda resp: POST_API_URL in resp.url,
-            timeout=SEND_API_TIMEOUT_MS,
+            lambda resp: post_api_url in resp.url,
+            timeout=api_timeout_ms,
         ) as response_info:
             send_button.click()
         response = response_info.value
@@ -194,46 +169,55 @@ def _click_send_button(page: Page) -> str | None:
 
 def create_post(
     browser: Browser,
+    config: PosterConfig,
     base_asset: str,
     content: str,
     image_path: str | None = None,
     debug: bool = False,
 ) -> str | None:
-    page = get_or_create_page(browser, TARGET_URL, GOTO_TIMEOUT_MS)
+    page = get_or_create_page(browser, config.target_url, config.goto_timeout_ms)
 
     if debug:
-        _debug_screenshot(page, "01_after_login")
+        _debug_screenshot(page, config.debug_screenshot_dir, "01_after_login")
 
     _focus_input_box(page)
     if debug:
-        _debug_screenshot(page, "02_after_focus_input")
+        _debug_screenshot(page, config.debug_screenshot_dir, "02_after_focus_input")
 
-    _input_symbol(page, base_asset)
+    _input_symbol(page, base_asset, config.symbol_dropdown_wait_seconds)
     if debug:
-        _debug_screenshot(page, "03_after_input_symbol")
+        _debug_screenshot(page, config.debug_screenshot_dir, "03_after_input_symbol")
 
     _input_content(page, content)
     if debug:
-        _debug_screenshot(page, "04_after_input_content")
+        _debug_screenshot(page, config.debug_screenshot_dir, "04_after_input_content")
     if image_path:
         img_file = Path(image_path)
         if not img_file.exists():
-            raise FileNotFoundError(f'Image file not found: {image_path}')
-        if img_file.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
+            raise FileNotFoundError(f"Image file not found: {image_path}")
+        if img_file.suffix.lower() not in config.supported_image_extensions:
             raise ValueError(
-                f'Unsupported image format: {img_file.suffix}. '
-                f'Supported: {', '.join(sorted(SUPPORTED_IMAGE_EXTENSIONS))}'
+                f"Unsupported image format: {img_file.suffix}. "
+                f"Supported: {', '.join(sorted(config.supported_image_extensions))}"
             )
-        _paste_image(page, image_path)
+        _paste_image(
+            page,
+            image_path,
+            config.image_upload_poll_count,
+            config.image_upload_poll_interval,
+            config.send_api_timeout_ms,
+        )
         if debug:
-            _debug_screenshot(page, "05_after_paste_image")
+            _debug_screenshot(page, config.debug_screenshot_dir, "05_after_paste_image")
 
-    _input_trade_widget(page, base_asset)
+    _input_trade_widget(page, base_asset, config.trade_widget_default_timeout_ms)
     if debug:
-        _debug_screenshot(page, "06_after_trade_widget")
+        _debug_screenshot(page, config.debug_screenshot_dir, "06_after_trade_widget")
 
-    share_link = _click_send_button(page)
+    share_link = _click_send_button(
+        page, config.post_api_url, config.send_button_timeout_ms, config.send_api_timeout_ms
+    )
     if debug:
-        _debug_screenshot(page, "07_after_send")
+        _debug_screenshot(page, config.debug_screenshot_dir, "07_after_send")
 
     return share_link

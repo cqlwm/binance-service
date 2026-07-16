@@ -8,23 +8,18 @@ from tempfile import NamedTemporaryFile, gettempdir as _gettempdir
 from playwright.sync_api import Browser
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
+from binance_service._config import ScreenshotConfig
 from binance_service._playwright import get_or_create_page
 
 logger = logging.getLogger("screenshot")
 
-BASE_URL = "https://www.binance.com/zh-CN/futures"
-SCREENSHOT_WINDOW_WIDTH = 430
-SCREENSHOT_WINDOW_HEIGHT = 932
+# DOM 选择器，与页面结构强耦合，保留为代码常量
 SWITCH_UI_SELECTOR = 'div[style="grid-area: switch;"]'
 CHART_UI_SELECTOR = 'div[style="grid-area: charts;"]'
-GOTO_TIMEOUT_MS = 60000
-SELECTOR_TIMEOUT_MS = 15000
-TIMEFRAME_CHOICES = ("5m", "15m", "1h", "4h", "1d", "1w")
-DEFAULT_TIMEFRAME = "1h"
-# 切换 K 线周期后等待图表重绘的时间
-TIMEFRAME_REDRAW_WAIT_MS = 5000
-# 导航后等待图表初始加载的时间
-CHART_INITIAL_WAIT_MS = 3000
+
+# 滚动条隐藏样式注入后的短等待，DOM 交互级，不入配置
+_SCROLLBAR_HIDE_WAIT_MS = 500
+
 
 def _image_merge(image1: str, image2: str, output: str):
 
@@ -41,48 +36,50 @@ def _image_merge(image1: str, image2: str, output: str):
     combined = Image.new("RGB", (new_width, new_height))
 
     # 依次粘贴图片
-    combined.paste(img1, (0, 0))          # 第一张贴顶部
-    combined.paste(img2, (0, img1.height))# 第二张贴第一张下方
+    combined.paste(img1, (0, 0))  # 第一张贴顶部
+    combined.paste(img2, (0, img1.height))  # 第二张贴第一张下方
 
     # 保存
     combined.save(output)
 
 
 def _resolve_output_path(symbol: str, timeframe: str, output: str | None) -> Path:
-    path = (
-        Path(output).expanduser()
-        if output
-        else Path(_gettempdir()) / f"{symbol}_{timeframe}_chart.png"
-    )
+    path = Path(output).expanduser() if output else Path(_gettempdir()) / f"{symbol}_{timeframe}_chart.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path: str | None) -> Path:
+def symbol_screenshot(
+    browser: Browser,
+    config: ScreenshotConfig,
+    symbol: str,
+    timeframe: str,
+    output_path: str | None,
+) -> Path:
     resolved_path = _resolve_output_path(symbol, timeframe, output_path)
 
-    url = f"{BASE_URL}/{symbol}"
+    url = f"{config.base_url}/{symbol}"
 
-    page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
-    page.set_viewport_size({"width": SCREENSHOT_WINDOW_WIDTH, "height": SCREENSHOT_WINDOW_HEIGHT})
+    page = get_or_create_page(browser, url, config.goto_timeout_ms)
+    page.set_viewport_size({"width": config.window_width, "height": config.window_height})
 
     try:
-        page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=SELECTOR_TIMEOUT_MS)
-        page.wait_for_timeout(CHART_INITIAL_WAIT_MS)
+        page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=config.selector_timeout_ms)
+        page.wait_for_timeout(config.chart_initial_wait_ms)
 
         timeframe_selector = f'div[id="{timeframe}"]'
         page.locator(timeframe_selector).click()
-        page.wait_for_timeout(TIMEFRAME_REDRAW_WAIT_MS)
+        page.wait_for_timeout(config.timeframe_redraw_wait_ms)
 
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(_SCROLLBAR_HIDE_WAIT_MS)
         page.evaluate("""(()=>{
             const s=document.createElement('style');
             s.id='__pw_hide_sb';
             s.textContent='::-webkit-scrollbar{display:none!important}';
             document.head.appendChild(s);
         })()""")
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(_SCROLLBAR_HIDE_WAIT_MS)
 
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
@@ -93,9 +90,7 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
         return resolved_path
 
     except PlaywrightTimeout as exc:
-        raise RuntimeError(
-            f"Selector {CHART_UI_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms"
-        ) from exc
+        raise RuntimeError(f"Selector {CHART_UI_SELECTOR} not visible after {config.selector_timeout_ms}ms") from exc
     finally:
         try:
             page.evaluate("(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()")

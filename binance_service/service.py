@@ -9,8 +9,6 @@ from binance_service._config import AppConfig
 from binance_service._playwright import connect_browser
 from binance_service.poster import create_post
 from binance_service.screenshot import symbol_screenshot
-from binance_service.screenshot import TIMEFRAME_CHOICES
-from binance_service.screenshot import DEFAULT_TIMEFRAME
 
 logger = logging.getLogger("service")
 
@@ -22,7 +20,7 @@ class BinanceService:
     共用同一个浏览器实例，避免反复开关 Chrome。
     """
 
-    def __init__(self, app_config: AppConfig = AppConfig(), browser: Browser | None = None) -> None:
+    def __init__(self, app_config: AppConfig, browser: Browser | None = None) -> None:
         self._app_config = app_config
         self._browser = browser
         self._owns_browser = browser is None
@@ -33,10 +31,7 @@ class BinanceService:
     @property
     def _browser_instance(self) -> Browser:
         if self._browser is None:
-            raise RuntimeError(
-                "Browser is not available. "
-                "Use as context manager or call open() first."
-            )
+            raise RuntimeError("Browser is not available. Use as context manager or call open() first.")
         return self._browser
 
     def open(self) -> None:
@@ -79,6 +74,7 @@ class BinanceService:
         """
         return create_post(
             browser=self._browser_instance,
+            config=self._app_config.poster,
             base_asset=base_asset,
             content=content,
             image_path=image_path,
@@ -90,15 +86,18 @@ class BinanceService:
         base_asset: str,
         content: str,
         quote: str = "USDT",
-        timeframe: str = "1h",
+        timeframe: str | None = None,
         debug: bool = False,
     ) -> str | None:
         """截图 + 发帖组合操作。
 
         如果未提供 image_path，先截取 K 线图再发帖。
         quote 为报价币（如 USDT、USDC），用于拼接交易对 symbol。
+        timeframe 默认取配置中的 default_timeframe。
         """
-        screenshot_path = self.symbol_screenshot(symbol=f"{base_asset}{quote}", timeframe=timeframe)
+        shot_cfg = self._app_config.screenshot
+        resolved_timeframe = shot_cfg.default_timeframe if timeframe is None else timeframe
+        screenshot_path = self.symbol_screenshot(symbol=f"{base_asset}{quote}", timeframe=resolved_timeframe)
         image_path = screenshot_path.as_posix()
 
         return self.create_post(
@@ -111,17 +110,16 @@ class BinanceService:
     def symbol_screenshot(
         self,
         symbol: str,
-        timeframe: str = DEFAULT_TIMEFRAME,
+        timeframe: str | None = None,
         output: str | None = None,
     ) -> Path:
         """截取 Binance 合约 K 线图。
 
-        参数含义同 ``binance_service.screenshot.take_futures_screenshot``，
-        但复用当前浏览器实例。
+        参数含义同 ``binance_service.screenshot.symbol_screenshot``，
+        但复用当前浏览器实例。timeframe 默认取配置中的 default_timeframe。
         """
-        if timeframe not in TIMEFRAME_CHOICES:
-            raise ValueError(
-                f"Invalid timeframe: {timeframe!r}. "
-                f"Choose from {TIMEFRAME_CHOICES}."
-            )
-        return symbol_screenshot(self._browser_instance, symbol, timeframe, output)
+        shot_cfg = self._app_config.screenshot
+        resolved_timeframe = shot_cfg.default_timeframe if timeframe is None else timeframe
+        if resolved_timeframe not in shot_cfg.timeframe_choices:
+            raise ValueError(f"Invalid timeframe: {resolved_timeframe!r}. Choose from {shot_cfg.timeframe_choices}.")
+        return symbol_screenshot(self._browser_instance, shot_cfg, symbol, resolved_timeframe, output)
