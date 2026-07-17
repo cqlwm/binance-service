@@ -1,0 +1,91 @@
+# binance-service 配置文件
+#
+# 复制本文件为 config.yaml 并按本机环境修改路径字段，然后通过
+#   binance --config config.yaml <子命令> ...
+# 或库调用 load_config("config.yaml") 加载。
+#
+# 路径字段支持 ~ 展开为用户家目录。
+
+# Chrome 可执行文件与登录态存储路径
+chrome:
+  bin_path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  user_data_dir: "~/.debug_chrome/1/user-data"
+  storage_state_path: "~/.debug_chrome/1/storage_state.json"
+  debug_address: "127.0.0.1"
+  debug_port: 18800
+
+# 浏览器窗口尺寸
+window:
+  width: 1920
+  height: 1080
+
+# 是否无头模式运行 Chrome
+headless: true
+
+# Playwright 浏览器启动行为参数
+browser:
+  device_scale_factor: 2.0
+  launch_args:
+    - "--no-first-run"
+    - "--no-default-browser-check"
+
+# Binance Square 发帖运营参数
+poster:
+  # Square 发帖页面 URL
+  target_url: "https://www.binance.com/zh-CN/square"
+  # 发帖 API 端点（用于拦截响应获取 shareLink）
+  post_api_url: "https://www.binance.com/bapi/composite/v5/private/pgc/content/add"
+  # 页面导航超时（毫秒）
+  goto_timeout_ms: 60000
+  # 输入资产标签后等待下拉列表渲染的时间（秒）
+  symbol_dropdown_wait_seconds: 3
+  # 交易 widget 列表默认等待超时（毫秒）
+  trade_widget_default_timeout_ms: 3000
+  # 发送按钮 active 状态等待超时（毫秒）
+  send_button_timeout_ms: 30000
+  # 发送 API 响应等待超时（毫秒）
+  send_api_timeout_ms: 30000
+  # 图片上传轮询最大次数
+  image_upload_poll_count: 30
+  # 图片上传轮询间隔（秒）
+  image_upload_poll_interval: 1.0
+  # 支持的图片扩展名
+  supported_image_extensions:
+    - ".png"
+    - ".jpg"
+    - ".jpeg"
+    - ".gif"
+    - ".webp"
+  # 调试截图输出目录
+  debug_screenshot_dir: "~/.debug_chrome/screenshots"
+
+# 合约 K 线截图运营参数
+screenshot:
+  # 合约页面基础 URL（symbol 会拼接在后）
+  base_url: "https://www.binance.com/zh-CN/futures"
+  # 截图视口尺寸（移动端布局）
+  window_width: 430
+  window_height: 932
+  # 页面导航超时（毫秒）
+  goto_timeout_ms: 60000
+  # 图表选择器出现等待超时（毫秒）
+  selector_timeout_ms: 15000
+  # 可选 K 线时间周期
+  timeframe_choices:
+    - "5m"
+    - "15m"
+    - "1h"
+    - "4h"
+    - "1d"
+    - "1w"
+  # 默认时间周期
+  default_timeframe: "1h"
+  # 切换 K 线周期后等待图表重绘的时间（毫秒）
+  timeframe_redraw_wait_ms: 5000
+  # 导航后等待图表初始加载的时间（毫秒）
+  chart_initial_wait_ms: 3000
+
+# CDP 就绪探测轮询参数（save-storage 命令使用）
+cdp:
+  retry_count: 20
+  retry_interval: 0.5

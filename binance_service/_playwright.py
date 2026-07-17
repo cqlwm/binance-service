@@ -12,7 +12,7 @@ from binance_service._config import AppConfig
 from binance_service.storage_state import restore_storage_state
 from binance_service.storage_state import save_storage_state
 
-logger = logging.getLogger("playwright")
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -31,17 +31,20 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
 
     logger.info(
         "Launching Chrome (headless=%s, window=%dx%d)",
-        config.headless, w, h,
+        config.headless,
+        w,
+        h,
     )
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=config.headless,
-            args=["--no-first-run", "--no-default-browser-check"],
+            executable_path=config.chrome.bin_path,
+            args=list(config.browser.launch_args),
         )
         context = browser.new_context(
             viewport=vp,
-            device_scale_factor=2,
+            device_scale_factor=config.browser.device_scale_factor,
         )
         restore_storage_state(context, config.chrome.storage_state_path)
 

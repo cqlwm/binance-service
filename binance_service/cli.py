@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from dataclasses import replace
+
 from binance_service import BinanceService
-from binance_service._config import AppConfig, WindowConfig
+from binance_service._config import AppConfig, load_config
 from binance_service.storage_state import save_storage_state_from_cdp
 
 logger = logging.getLogger("cli")
@@ -19,19 +21,23 @@ def _setup_logging(verbose: bool) -> None:
 
 
 def _add_global_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--config", required=True, help="config.yaml 配置文件路径")
     parser.add_argument("--headed", action="store_true", help="有头模式启动 Chrome（显示 GUI）")
     parser.add_argument("-v", "--verbose", action="store_true", help="输出 DEBUG 级别日志")
 
 
-def _build_app_config(headed: bool, window: WindowConfig | None = None) -> AppConfig:
-    return AppConfig(headless=not headed, window=window or WindowConfig())
+def _load_app_config(args: argparse.Namespace) -> AppConfig:
+    app_config = load_config(args.config)
+    if args.headed:
+        app_config = replace(app_config, headless=False)
+    return app_config
 
 
 # ── post ─────────────────────────────────────────────────────
 
 
 def cmd_post(args: argparse.Namespace) -> None:
-    cfg = _build_app_config(args.headed)
+    cfg = _load_app_config(args)
     with BinanceService(app_config=cfg) as svc:
         share_link = svc.create_post(
             base_asset=args.base,
@@ -58,7 +64,7 @@ def register_post(sub: argparse.ArgumentParser) -> None:
 
 
 def cmd_screenshot(args: argparse.Namespace) -> None:
-    cfg = _build_app_config(args.headed)
+    cfg = _load_app_config(args)
     with BinanceService(app_config=cfg) as svc:
         result = svc.symbol_screenshot(
             symbol=args.symbol,
@@ -73,8 +79,8 @@ def register_screenshot(sub: argparse.ArgumentParser) -> None:
     sub.add_argument(
         "--timeframe",
         choices=("5m", "15m", "1h", "4h", "1d", "1w"),
-        default="1h",
-        help="K 线时间周期，默认 1h",
+        default=None,
+        help="K 线时间周期，默认取配置中的 default_timeframe",
     )
     sub.add_argument("--output", default=None, help="截图保存路径")
     sub.set_defaults(func=cmd_screenshot)
@@ -84,7 +90,7 @@ def register_screenshot(sub: argparse.ArgumentParser) -> None:
 
 
 def cmd_postx(args: argparse.Namespace) -> None:
-    cfg = _build_app_config(args.headed)
+    cfg = _load_app_config(args)
     with BinanceService(app_config=cfg) as svc:
         share_link = svc.create_postx(
             base_asset=args.base,
@@ -107,8 +113,8 @@ def register_postx(sub: argparse.ArgumentParser) -> None:
     sub.add_argument(
         "--timeframe",
         choices=("5m", "15m", "1h", "4h", "1d", "1w"),
-        default="1h",
-        help="K 线时间周期，默认 1h",
+        default=None,
+        help="K 线时间周期，默认取配置中的 default_timeframe",
     )
     sub.add_argument("--debug", action="store_true", help="启用调试截图")
     sub.set_defaults(func=cmd_postx)
@@ -118,7 +124,7 @@ def register_postx(sub: argparse.ArgumentParser) -> None:
 
 
 def cmd_save_storage(args: argparse.Namespace) -> None:
-    cfg = AppConfig()
+    cfg = _load_app_config(args)
     save_storage_state_from_cdp(cfg, target_url=args.url)
     print(f"✅ 登录态已保存到 {cfg.chrome.storage_state_path}")
 
@@ -137,7 +143,7 @@ def register_save_storage(sub: argparse.ArgumentParser) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Binance 命令行工具集 — 截图合约 K 线、发布 Square 帖子",
+        description="Binance 命令行工具集 - 截图合约 K 线、发布 Square 帖子",
     )
     _add_global_args(parser)
 

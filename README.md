@@ -11,6 +11,8 @@
 | `binance postx` | 截图 + 发帖组合操作 |
 | `binance save-storage` | 导出 Chrome 登录态，供 Headless 模式复用 |
 
+> 所有命令均需通过 `--config <path>` 指定 `config.yaml` 配置文件（见[配置](#配置)章节）。
+
 ## 工作原理
 
 脚本通过 **Playwright** 启动 Chrome 实例，自动恢复之前保存的登录态。登录态管理分为两步：
@@ -68,15 +70,24 @@ uv run playwright install chromium
 
 ## 快速开始
 
+### 0. 准备配置文件
+
+```bash
+# 复制配置模板，按本机环境修改路径字段
+cp config.example.yaml config.yaml
+```
+
+`config.yaml` 中需根据实际情况调整 `chrome.bin_path`、`chrome.storage_state_path` 等路径字段。路径支持 `~` 展开为用户家目录。详见[配置](#配置)章节。
+
 ### 1. 首次使用：导出登录态
 
 ```bash
 # 确保 Chrome 已登录币安账号
 # 导出登录态（cookies + localStorage）
-uv run binance save-storage
+uv run binance --config config.yaml save-storage
 ```
 
-登录态会保存到 `~/.debug_chrome/1/storage_state.json`，后续所有命令会自动加载。
+登录态会保存到配置文件中 `chrome.storage_state_path` 指定的路径（默认 `~/.debug_chrome/1/storage_state.json`），后续所有命令会自动加载。
 
 > **注意**：登录态过期后需要重新导出。币安登录态通常有效期为数天到数周。
 
@@ -84,26 +95,26 @@ uv run binance save-storage
 
 ```bash
 # Headless 模式（默认，后台运行）
-uv run binance post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
+uv run binance --config config.yaml post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
 
 # 有头模式（弹出 Chrome 窗口，调试用）
-uv run binance post --base DOGE --content "UP UP UP" --headed
+uv run binance --config config.yaml post --base DOGE --content "UP UP UP" --headed
 ```
 
 ### 3. 截取 K 线图
 
 ```bash
 # Headless 模式（默认）
-uv run binance screenshot --symbol BTCUSDC
+uv run binance --config config.yaml screenshot --symbol BTCUSDC
 
 # 指定周期和输出路径
-uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
+uv run binance --config config.yaml screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
 ```
 
 ### 4. 截图 + 发帖组合
 
 ```bash
-uv run binance postx --base BTC --content "BTC looks bullish!"
+uv run binance --config config.yaml postx --base BTC --content "BTC looks bullish!"
 ```
 
 ## 库函数使用
@@ -181,10 +192,20 @@ finally:
 
 ## CLI 参考
 
-### binance post — 发布帖子
+所有子命令共享以下全局参数：
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `--config` | 是 | `config.yaml` 配置文件路径 |
+| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
+| `-v` / `--verbose` | 否 | 输出 DEBUG 级别日志 |
+
+全局参数需写在子命令之前，例如：`binance --config config.yaml post ...`。
+
+### binance post - 发布帖子
 
 ```bash
-uv run binance post --base <资产> --content "<正文>" [选项]
+uv run binance --config config.yaml post --base <资产> --content "<正文>" [选项]
 ```
 
 | 参数 | 必填 | 说明 |
@@ -192,20 +213,19 @@ uv run binance post --base <资产> --content "<正文>" [选项]
 | `--base` | 是 | 交易对基础资产，如 `DOGE`、`BTC` |
 | `--content` | 是 | 帖子正文 |
 | `--image` | 否 | 本地图片路径，支持 PNG / JPEG / GIF / WebP |
-| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
-| `--debug` | 否 | 启用调试模式，每一步截图保存到 `~/.debug_chrome/screenshots/` |
+| `--debug` | 否 | 启用调试模式，每一步截图保存到配置中的 `poster.debug_screenshot_dir` |
 
 示例：
 
 ```bash
 # 纯文字帖子
-uv run binance post --base DOGE --content "DOGE to the moon!"
+uv run binance --config config.yaml post --base DOGE --content "DOGE to the moon!"
 
 # 图文帖子
-uv run binance post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png
+uv run binance --config config.yaml post --base BTC --content "BTC 突破前高" --image /tmp/btc_chart.png
 
 # 调试模式（排查问题时使用）
-uv run binance post --base DOGE --content "test" --image test.png --debug
+uv run binance --config config.yaml post --base DOGE --content "test" --image test.png --debug
 ```
 
 ### binance screenshot — 合约页截图
@@ -213,27 +233,26 @@ uv run binance post --base DOGE --content "test" --image test.png --debug
 截取合约页的 TradingView K 线图（合并 switch 区域和 chart 区域为一张完整图片）。
 
 ```bash
-uv run binance screenshot --symbol <交易对> [选项]
+uv run binance --config config.yaml screenshot --symbol <交易对> [选项]
 ```
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
 | `--symbol` | 是 | 合约交易对，如 `BTCUSDC`、`ETHUSDC` |
-| `--timeframe` | 否 | K 线周期：`5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认 `1h` |
+| `--timeframe` | 否 | K 线周期：`5m`、`15m`、`1h`、`4h`、`1d`、`1w`，默认取配置中的 `screenshot.default_timeframe` |
 | `--output` | 否 | 截图保存路径，默认 `./<symbol>_<timeframe>_chart.png` |
-| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
 
 示例：
 
 ```bash
-# 默认 1h 周期
-uv run binance screenshot --symbol BTCUSDC
+# 默认周期（取配置中的 default_timeframe）
+uv run binance --config config.yaml screenshot --symbol BTCUSDC
 
 # 日线图
-uv run binance screenshot --symbol BTCUSDC --timeframe 1d
+uv run binance --config config.yaml screenshot --symbol BTCUSDC --timeframe 1d
 
 # 指定输出路径
-uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
+uv run binance --config config.yaml screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.png
 ```
 
 ### binance postx — 截图 + 发帖组合
@@ -241,7 +260,7 @@ uv run binance screenshot --symbol ETHUSDC --timeframe 4h --output /tmp/eth_4h.p
 先截取 K 线图，再附带截图发布帖子。
 
 ```bash
-uv run binance postx --base <资产> --content "<正文>" [选项]
+uv run binance --config config.yaml postx --base <资产> --content "<正文>" [选项]
 ```
 
 | 参数 | 必填 | 说明 |
@@ -249,44 +268,72 @@ uv run binance postx --base <资产> --content "<正文>" [选项]
 | `--base` | 是 | 交易对基础资产，如 `DOGE`、`BTC` |
 | `--content` | 是 | 帖子正文 |
 | `--quote` | 否 | 报价币，默认 `USDT`（用于拼接交易对 symbol） |
-| `--timeframe` | 否 | K 线周期，默认 `1h` |
-| `--headed` | 否 | 以有头模式启动 Chrome（显示 GUI，调试用） |
+| `--timeframe` | 否 | K 线周期，默认取配置中的 `screenshot.default_timeframe` |
 | `--debug` | 否 | 启用调试模式 |
 
-### binance save-storage — 导出登录态
+### binance save-storage - 导出登录态
 
 通过 CDP 连接已有 Chrome，导出 cookies 和 localStorage，供自动化操作复用。
 
 ```bash
-uv run binance save-storage [--url <页面URL>]
+uv run binance --config config.yaml save-storage [--url <页面URL>]
 ```
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
 | `--url` | 否 | 登录后导航到的页面，默认 `https://www.binance.com/zh-CN/square` |
 
-登录态保存路径：`~/.debug_chrome/1/storage_state.json`
+登录态保存路径：配置文件中 `chrome.storage_state_path` 指定的路径（默认 `~/.debug_chrome/1/storage_state.json`）
 
 ## 配置
 
-配置文件位于 `~/.binance-service/.env`，可自定义 Chrome 路径和相关配置：
+项目通过单一 `config.yaml` 文件统一管理所有配置，不再使用环境变量或硬编码。仓库提供 `config.example.yaml` 模板，复制为 `config.yaml` 后按本机环境修改即可：
 
-```env
-# Chrome 可执行文件路径
-CHROME_BIN=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
-
-# 登录态存储路径（必需，用于恢复浏览器登录会话）
-STORAGE_STATE_PATH=~/.debug_chrome/1/storage_state.json
-
-# save-storage 命令使用的 Chrome 用户数据目录
-USER_DATA_DIR=~/.debug_chrome/1/user-data
-
-# save-storage 命令使用的 CDP 调试地址和端口
-DEBUG_ADDRESS=127.0.0.1
-DEBUG_PORT=18800
+```bash
+cp config.example.yaml config.yaml
 ```
 
-所有配置均有默认值，不配置 `.env` 也可直接使用。
+配置文件结构如下（完整字段与注释见 `config.example.yaml`）：
+
+| 分组 | 说明 | 关键字段 |
+|------|------|---------|
+| `chrome` | Chrome 路径与 CDP/登录态配置 | `bin_path`、`storage_state_path`、`user_data_dir`、`debug_address`、`debug_port` |
+| `window` | 浏览器窗口尺寸 | `width`、`height` |
+| `headless` | 是否无头模式运行 Chrome | `true` / `false` |
+| `browser` | Playwright 启动行为 | `device_scale_factor`、`launch_args` |
+| `poster` | 发帖运营参数 | `target_url`、`post_api_url`、各类超时、`supported_image_extensions` |
+| `screenshot` | 截图运营参数 | `base_url`、视口尺寸、`timeframe_choices`、`default_timeframe` |
+| `cdp` | CDP 就绪探测轮询 | `retry_count`、`retry_interval` |
+
+路径字段支持 `~` 展开为用户家目录。所有字段均为必填，缺失字段会在加载时报错并提示具体路径。
+
+### 作为库使用
+
+本项目也可被其他项目以函数调用方式使用：
+
+```python
+from binance_service import BinanceService, load_config
+
+# 从 config.yaml 加载配置
+app_config = load_config("config.yaml")
+
+# 复用同一浏览器实例执行多次操作
+with BinanceService(app_config=app_config) as svc:
+    # 截图
+    svc.symbol_screenshot(symbol="BTCUSDT", timeframe="1d")
+    # 发帖
+    svc.create_post(base_asset="BTC", content="BTC looks bullish!")
+```
+
+如需在运行时覆盖个别字段（如切换为有头模式），可用 `dataclasses.replace`：
+
+```python
+from dataclasses import replace
+from binance_service import load_config
+
+app_config = load_config("config.yaml")
+app_config = replace(app_config, headless=False)
+```
 
 ## 项目结构
 
@@ -294,7 +341,7 @@ DEBUG_PORT=18800
 binance-service/
 ├── binance_service/
 │   ├── __init__.py         # 公开 API
-│   ├── _config.py          # 配置管理（从 ~/.binance-service/.env 加载）
+│   ├── _config.py          # 配置管理（从 config.yaml 加载）
 │   ├── _chrome.py          # CDP Chrome 进程管理（仅 save-storage 使用）
 │   ├── _playwright.py      # Playwright 浏览器生命周期管理
 │   ├── storage_state.py    # 登录态序列化/反序列化（restore / save / CDP 导出）
@@ -304,6 +351,7 @@ binance-service/
 │   └── service.py          # BinanceService 封装
 ├── tests/
 │   └── test_e2e.py         # 端到端集成测试
+├── config.example.yaml     # 配置文件模板
 ├── pyproject.toml          # 项目配置与依赖
 ├── uv.lock                 # 依赖锁定文件
 └── README.md
@@ -313,7 +361,7 @@ binance-service/
 
 **Q: 截图模糊或只有黑色？**
 
-截图前 Chrome 窗口被其他操作打断会导致渲染异常。脚本内置了图表加载等待（3s），若网络较慢可适当增加 `CHART_INITIAL_WAIT_MS` 和 `TIMEFRAME_REDRAW_WAIT_MS` 的值。
+截图前 Chrome 窗口被其他操作打断会导致渲染异常。脚本内置了图表加载等待，若网络较慢可在 `config.yaml` 中适当增加 `screenshot.chart_initial_wait_ms` 和 `screenshot.timeframe_redraw_wait_ms` 的值。
 
 **Q: 帖子发送按钮一直灰色不可点击？**
 
@@ -323,10 +371,10 @@ binance-service/
 
 **Q: 如何排查发帖失败问题？**
 
-使用 `--debug` 模式，每一步都会截图保存到 `~/.debug_chrome/screenshots/`：
+使用 `--debug` 模式，每一步都会截图保存到配置文件中 `poster.debug_screenshot_dir` 指定的目录：
 
 ```bash
-uv run binance post --base DOGE --content "test" --debug
+uv run binance --config config.yaml post --base DOGE --content "test" --debug
 ```
 
 **Q: 登录态过期了怎么办？**
@@ -335,12 +383,12 @@ uv run binance post --base DOGE --content "test" --debug
 
 ```bash
 # 确保 Chrome 中已重新登录币安
-uv run binance save-storage
+uv run binance --config config.yaml save-storage
 ```
 
 **Q: 支持 Windows / Linux 吗？**
 
-目前仅测试了 macOS。Linux 和 Windows 理论上可用，需要调整 Chrome 路径配置。
+目前仅测试了 macOS。Linux 和 Windows 理论上可用，需要在 `config.yaml` 中调整 `chrome.bin_path` 为对应平台的 Chrome 路径。
 
 ## 开发
 

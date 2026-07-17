@@ -8,7 +8,7 @@ dependencies = [
     "pillow>=12.2.0",
     "playwright>=1.60.0",
     "pytest-playwright>=0.8.0",
-    "python-dotenv>=1.2.2",
+    "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
@@ -20,6 +20,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["binance_service"]
+
+[tool.ruff]
+line-length = 120
 
 [tool.uv]
 package = true
@@ -33,4 +36,5 @@ ignore = ["*_service/type_wrapper/*_wrapper.py"]
 [dependency-groups]
 dev = [
     "pyright>=1.1.411",
+    "ruff>=0.15.21",
 ]
