@@ -12,6 +12,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import PosterConfig
 from binance_service._playwright import get_or_create_page
+from binance_service.login_state import verify_login_state
 
 logger = logging.getLogger("poster")
 
@@ -176,6 +177,10 @@ def create_post(
     debug: bool = False,
 ) -> str | None:
     page = get_or_create_page(browser, config.target_url, config.goto_timeout_ms)
+
+    # 校验登录态：reload 触发前端自动发起 userInfo 请求，被动捕获并校验响应，
+    # 失败时抛出 LoginStateError 中止发帖，避免后续 DOM 操作无谓失败
+    verify_login_state(page, config.user_info_api_url, config.user_info_api_timeout_ms)
 
     if debug:
         _debug_screenshot(page, config.debug_screenshot_dir, "01_after_login")

@@ -301,7 +301,7 @@ cp config.example.yaml config.yaml
 | `window` | 浏览器窗口尺寸 | `width`、`height` |
 | `headless` | 是否无头模式运行 Chrome | `true` / `false` |
 | `browser` | Playwright 启动行为 | `device_scale_factor`、`launch_args` |
-| `poster` | 发帖运营参数 | `target_url`、`post_api_url`、各类超时、`supported_image_extensions` |
+| `poster` | 发帖运营参数 | `target_url`、`post_api_url`、`user_info_api_url`、`user_info_api_timeout_ms`、各类超时、`supported_image_extensions` |
 | `screenshot` | 截图运营参数 | `base_url`、视口尺寸、`timeframe_choices`、`default_timeframe` |
 | `cdp` | CDP 就绪探测轮询 | `retry_count`、`retry_interval` |
 
@@ -379,7 +379,9 @@ uv run binance --config config.yaml post --base DOGE --content "test" --debug
 
 **Q: 登录态过期了怎么办？**
 
-重新运行 `binance save-storage` 导出最新登录态：
+发帖前会自动被动校验登录态：打开 Binance Square 页面时拦截前端发起的 `userInfo` 请求，校验 `code=="000000"` 且 `success==true`。校验失败会抛出 `LoginStateError` 并中止发帖，日志会给出具体原因（如 `code 异常`、`success=false`、`非 200 状态码`、`请求未出现`）。
+
+此时需要重新运行 `binance save-storage` 导出最新登录态：
 
 ```bash
 # 确保 Chrome 中已重新登录币安

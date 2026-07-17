@@ -81,7 +81,7 @@ def symbol_screenshot(
         })()""")
         page.wait_for_timeout(_SCROLLBAR_HIDE_WAIT_MS)
 
-        skeleton = page.locator('div.futures-skeleton-root')
+        skeleton = page.locator("div.futures-skeleton-root")
         if skeleton.count() > 0:
             skeleton.evaluate_all("els => els.forEach(el => el.remove())")
             page.wait_for_timeout(500)

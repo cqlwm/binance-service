@@ -52,6 +52,8 @@ class PosterConfig:
 
     target_url: str
     post_api_url: str
+    user_info_api_url: str
+    user_info_api_timeout_ms: int
     goto_timeout_ms: int
     symbol_dropdown_wait_seconds: int
     trade_widget_default_timeout_ms: int
@@ -196,6 +198,8 @@ def _parse_poster(data: dict[str, object]) -> PosterConfig:
     return PosterConfig(
         target_url=_require_str(section, "target_url", p),
         post_api_url=_require_str(section, "post_api_url", p),
+        user_info_api_url=_require_str(section, "user_info_api_url", p),
+        user_info_api_timeout_ms=_require_int(section, "user_info_api_timeout_ms", p),
         goto_timeout_ms=_require_int(section, "goto_timeout_ms", p),
         symbol_dropdown_wait_seconds=_require_int(section, "symbol_dropdown_wait_seconds", p),
         trade_widget_default_timeout_ms=_require_int(section, "trade_widget_default_timeout_ms", p),

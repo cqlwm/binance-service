@@ -62,11 +62,13 @@ def save_storage_state(context: BrowserContext, storage_state_path: str) -> None
 def is_cdp_ready(config: AppConfig) -> bool:
     from urllib.error import URLError
     from urllib.request import urlopen
+
     try:
         with urlopen(config.chrome.version_url, timeout=1):
             return True
     except (URLError, TimeoutError, OSError):
         return False
+
 
 def save_storage_state_from_cdp(config: AppConfig, target_url: str) -> None:
     """Connect to headed Chrome via CDP, navigate to *target_url*, and dump storage state.
