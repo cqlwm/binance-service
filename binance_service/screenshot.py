@@ -84,6 +84,11 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
         })()""")
         page.wait_for_timeout(500)
 
+        skeleton = page.locator('div[class="futures-skeleton-root"]')
+        if skeleton.count() > 0:
+            skeleton.evaluate_all("els => els.forEach(el => el.remove())")
+            page.wait_for_timeout(500)
+
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
             page.locator(CHART_UI_SELECTOR).screenshot(path=str(f2.name), scale="device")
