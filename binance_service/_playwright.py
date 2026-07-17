@@ -63,6 +63,6 @@ def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = 
 
     context = browser.contexts[0] if browser.contexts else browser.new_context()
     page = context.new_page()
-    page.goto(target_url, wait_until="load", timeout=timeout)
+    page.goto(target_url, wait_until="domcontentloaded", timeout=timeout)
     logger.info("Opened new tab: %s", page.url)
     return page
