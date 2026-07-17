@@ -5,8 +5,8 @@ description = "通过 Chrome 自动化操作币安（Binance）的命令行工�
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "pillow>=12.2.0",
-    "playwright>=1.60.0",
+    "pillow>=12.3.0",
+    "playwright>=1.61.0",
     "pytest-playwright>=0.8.0",
     "pyyaml>=6.0.3",
 ]
