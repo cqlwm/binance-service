@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from PIL import Image
 from tempfile import NamedTemporaryFile, gettempdir as _gettempdir
 
-from playwright.sync_api import Browser
+from PIL import Image
+from playwright.sync_api import Browser, Page
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._playwright import get_or_create_page
@@ -25,6 +27,30 @@ DEFAULT_TIMEFRAME = "1h"
 TIMEFRAME_REDRAW_WAIT_MS = 5000
 # 导航后等待图表初始加载的时间
 CHART_INITIAL_WAIT_MS = 3000
+# 调试快照存放目录（仅在选择器超时等失败时写入）
+DEBUG_SNAPSHOT_DIR = Path(_gettempdir()) / "binance_service_debug"
+
+
+def _dump_debug_snapshot(page: Page, tag: str) -> None:
+    """选择器超时等失败时，把当前页面截图 + HTML 落盘，便于离线排查 headless 渲染问题。
+
+    币安在 headless 下可能被风控拦截、跳转登录页、或加载不同 UI 版本，
+    仅凭选择器超时无法定位根因，所以失败时保留现场。
+    """
+    try:
+        DEBUG_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        png_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.png"
+        html_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.html"
+        page.screenshot(path=str(png_path), full_page=True)
+        html_path.write_text(page.content(), encoding="utf-8")
+        logger.error(
+            "Debug snapshot saved: %s, %s (url=%s, title=%s)",
+            png_path, html_path, page.url, page.title(),
+        )
+    except PlaywrightError as exc:
+        logger.error("Failed to dump debug snapshot: %s", exc)
+
 
 def _image_merge(image1: str, image2: str, output: str):
 
@@ -98,6 +124,7 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
         return resolved_path
 
     except PlaywrightTimeout as exc:
+        _dump_debug_snapshot(page, f"chart_timeout_{symbol}_{timeframe}")
         raise RuntimeError(
             f"Selector {CHART_UI_SELECTOR} not visible after {SELECTOR_TIMEOUT_MS}ms"
         ) from exc
