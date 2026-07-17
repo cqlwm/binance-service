@@ -109,6 +109,7 @@ def symbol_screenshot(browser: Browser, symbol: str, timeframe: str, output_path
     url = f"{BASE_URL}/{symbol}"
 
     page = get_or_create_page(browser, url, GOTO_TIMEOUT_MS)
+    page.wait_for_timeout(30000)
     page.set_viewport_size({"width": SCREENSHOT_WINDOW_WIDTH, "height": SCREENSHOT_WINDOW_HEIGHT})
 
     try:
