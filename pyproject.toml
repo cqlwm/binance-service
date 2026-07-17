@@ -5,9 +5,9 @@ description = "通过 Chrome 自动化操作币安（Binance）的命令行工�
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "cloakbrowser>=0.4.3",
-    "pillow>=12.2.0",
-    "playwright>=1.60.0",
+    "cloakbrowser>=0.4.11",
+    "pillow>=12.3.0",
+    "playwright>=1.61.0",
     "pytest-playwright>=0.8.0",
     "python-dotenv>=1.2.2",
 ]
@@ -18,6 +18,10 @@ binance = "binance_service.cli:main"
 [build-system]
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["binance_service*"]
+exclude = ["typings*", "tests*", "build*", "dist*"]
 
 [tool.uv]
 package = true
