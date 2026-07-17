@@ -18,7 +18,7 @@ SCREENSHOT_WINDOW_HEIGHT = 932
 SWITCH_UI_SELECTOR = 'div[style="grid-area: switch;"]'
 CHART_UI_SELECTOR = 'div[style="grid-area: charts;"]'
 GOTO_TIMEOUT_MS = 60000
-SELECTOR_TIMEOUT_MS = 15000
+SELECTOR_TIMEOUT_MS = 30000
 TIMEFRAME_CHOICES = ("5m", "15m", "1h", "4h", "1d", "1w")
 DEFAULT_TIMEFRAME = "1h"
 # 切换 K 线周期后等待图表重绘的时间
