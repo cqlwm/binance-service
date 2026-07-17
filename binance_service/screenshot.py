@@ -29,27 +29,46 @@ TIMEFRAME_REDRAW_WAIT_MS = 5000
 CHART_INITIAL_WAIT_MS = 3000
 # 调试快照存放目录（仅在选择器超时等失败时写入）
 DEBUG_SNAPSHOT_DIR = Path(_gettempdir()) / "binance_service_debug"
+# 快照抓取的单步超时：页面已处于异常态，不能用默认 30s，否则快照本身也会超时
+DEBUG_SNAPSHOT_TIMEOUT_MS = 5000
 
 
 def _dump_debug_snapshot(page: Page, tag: str) -> None:
     """选择器超时等失败时，把当前页面截图 + HTML 落盘，便于离线排查 headless 渲染问题。
 
-    币安在 headless 下可能被风控拦截、跳转登录页、或加载不同 UI 版本，
+    币安在 headless 下可能被风控拦截、跳转登录页、或卡在资源加载阶段，
     仅凭选择器超时无法定位根因，所以失败时保留现场。
+    分步抓取并各自保护，保证至少 HTML 一定能拿到（content 不依赖资源加载）。
     """
     try:
         DEBUG_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        png_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.png"
-        html_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.html"
-        page.screenshot(path=str(png_path), full_page=True)
+    except OSError as exc:
+        logger.error("Failed to create debug snapshot dir: %s", exc)
+        return
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # 1. HTML 优先：page.content() 读当前 DOM，不等待资源，几乎不会卡
+    html_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.html"
+    try:
         html_path.write_text(page.content(), encoding="utf-8")
         logger.error(
-            "Debug snapshot saved: %s, %s (url=%s, title=%s)",
-            png_path, html_path, page.url, page.title(),
+            "Debug HTML saved: %s (url=%s, title=%s)",
+            html_path, page.url, page.title(),
         )
     except PlaywrightError as exc:
-        logger.error("Failed to dump debug snapshot: %s", exc)
+        logger.error("Failed to dump debug HTML: %s", exc)
+
+    # 2. 视口截图：full_page=True 在卡死页面上要等所有资源，容易超时，故只截视口并加短超时
+    png_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.png"
+    try:
+        page.screenshot(
+            path=str(png_path),
+            full_page=False,
+            timeout=DEBUG_SNAPSHOT_TIMEOUT_MS,
+        )
+        logger.error("Debug PNG saved: %s", png_path)
+    except PlaywrightError as exc:
+        logger.error("Failed to dump debug PNG (page likely stuck on resource load): %s", exc)
 
 
 def _image_merge(image1: str, image2: str, output: str):
