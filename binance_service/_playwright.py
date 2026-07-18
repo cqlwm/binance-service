@@ -58,6 +58,8 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
             if not error_occurred:
                 save_storage_state(context, config.chrome.storage_state_path)
             context.close()
+            browser.close()
+            logger.info("Closed Chrome !")
 
 
 def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = None) -> Page:

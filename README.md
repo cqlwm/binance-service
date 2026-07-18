@@ -65,6 +65,7 @@
 uv sync
 
 # 安装 Playwright Chromium 浏览器引擎
+uv run playwright install-deps
 uv run playwright install chromium
 ```
 

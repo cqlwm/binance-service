@@ -20,10 +20,9 @@ class BinanceService:
     共用同一个浏览器实例，避免反复开关 Chrome。
     """
 
-    def __init__(self, app_config: AppConfig, browser: Browser | None = None) -> None:
+    def __init__(self, app_config: AppConfig) -> None:
         self._app_config = app_config
-        self._browser = browser
-        self._owns_browser = browser is None
+        self._browser: Browser | None = None
         self._cm: contextlib.AbstractContextManager[Browser] | None = None
 
     # ── 生命周期 ──────────────────────────────────────────────
@@ -38,7 +37,6 @@ class BinanceService:
         """打开浏览器（如尚未打开）。"""
         if self._browser is not None:
             return
-        self._owns_browser = True
         cm = connect_browser(self._app_config)
         self._browser = cm.__enter__()
         self._cm = cm
@@ -47,7 +45,7 @@ class BinanceService:
         """关闭浏览器。"""
         if self._browser is None:
             return
-        if self._owns_browser and self._cm is not None:
+        if self._cm is not None:
             self._cm.__exit__(None, None, None)
         self._browser = None
         self._cm = None
