@@ -39,7 +39,6 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=config.headless,
-            executable_path=config.chrome.bin_path,
             args=list(config.browser.launch_args),
         )
         context = browser.new_context(

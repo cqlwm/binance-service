@@ -78,7 +78,7 @@ uv run playwright install chromium
 cp config.example.yaml config.yaml
 ```
 
-`config.yaml` 中需根据实际情况调整 `chrome.bin_path`、`chrome.storage_state_path` 等路径字段。路径支持 `~` 展开为用户家目录。详见[配置](#配置)章节。
+`config.yaml` 中需根据实际情况调整 `chrome.storage_state_path` 等路径字段。路径支持 `~` 展开为用户家目录。首次使用前需运行 `uv run playwright install chromium` 安装 Playwright 捆绑的 Chromium。详见[配置](#配置)章节。
 
 ### 1. 首次使用：导出登录态
 
@@ -276,6 +276,17 @@ uv run binance --config config.yaml postx --base <资产> --content "<正文>" [
 
 通过 CDP 连接已有 Chrome，导出 cookies 和 localStorage，供自动化操作复用。
 
+运行前需先手动启动带调试端口的 Chrome 并登录币安账号（端口与 `config.yaml` 中 `chrome.debug_port` 一致）：
+
+```bash
+# 示例：以独立 user-data 目录启动 Chrome，开启调试端口
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=18800 \
+  --user-data-dir=~/.debug_chrome/1/user-data
+```
+
+然后在另一个终端运行 save-storage：
+
 ```bash
 uv run binance --config config.yaml save-storage [--url <页面URL>]
 ```
@@ -298,7 +309,7 @@ cp config.example.yaml config.yaml
 
 | 分组 | 说明 | 关键字段 |
 |------|------|---------|
-| `chrome` | Chrome 路径与 CDP/登录态配置 | `bin_path`、`storage_state_path`、`user_data_dir`、`debug_address`、`debug_port` |
+| `chrome` | Chrome CDP 调试与登录态配置 | `storage_state_path`、`debug_address`、`debug_port` |
 | `window` | 浏览器窗口尺寸 | `width`、`height` |
 | `headless` | 是否无头模式运行 Chrome | `true` / `false` |
 | `browser` | Playwright 启动行为 | `device_scale_factor`、`launch_args` |
@@ -391,7 +402,7 @@ uv run binance --config config.yaml save-storage
 
 **Q: 支持 Windows / Linux 吗？**
 
-目前仅测试了 macOS。Linux 和 Windows 理论上可用，需要在 `config.yaml` 中调整 `chrome.bin_path` 为对应平台的 Chrome 路径。
+目前仅测试了 macOS。Linux 和 Windows 理论上可用，需要运行 `uv run playwright install chromium` 安装对应平台的 Chromium。
 
 ## 开发
 

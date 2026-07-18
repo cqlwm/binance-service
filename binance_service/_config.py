@@ -13,10 +13,8 @@ logger = logging.getLogger("_config")
 
 @dataclass(frozen=True)
 class ChromeConfig:
-    """Chrome 可执行文件与 CDP 调试、登录态存储相关路径。"""
+    """Chrome CDP 调试与登录态存储相关配置。"""
 
-    bin_path: str
-    user_data_dir: str
     storage_state_path: str
     debug_address: str
     debug_port: int
@@ -166,8 +164,6 @@ def _parse_chrome(data: dict[str, object]) -> ChromeConfig:
     p = "chrome"
     section = _require_dict(data, p, p)
     return ChromeConfig(
-        bin_path=_expand(_require_str(section, "bin_path", p)),
-        user_data_dir=_expand(_require_str(section, "user_data_dir", p)),
         storage_state_path=_expand(_require_str(section, "storage_state_path", p)),
         debug_address=_require_str(section, "debug_address", p),
         debug_port=_require_int(section, "debug_port", p),

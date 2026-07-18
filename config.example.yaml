@@ -6,10 +6,8 @@
 #
 # 路径字段支持 ~ 展开为用户家目录。
 
-# Chrome 可执行文件与登录态存储路径
+# Chrome CDP 调试与登录态存储路径
 chrome:
-  bin_path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-  user_data_dir: "~/.debug_chrome/1/user-data"
   storage_state_path: "~/.debug_chrome/1/storage_state.json"
   debug_address: "127.0.0.1"
   debug_port: 18800
