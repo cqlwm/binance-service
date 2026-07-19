@@ -45,6 +45,8 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
             viewport=vp,
             device_scale_factor=config.browser.device_scale_factor,
         )
+        context.set_default_timeout(30000)
+        context.set_default_navigation_timeout(60000)
         restore_storage_state(context, config.chrome.storage_state_path)
 
         error_occurred = False

@@ -17,10 +17,6 @@ logger = logging.getLogger("screenshot")
 SWITCH_UI_SELECTOR = 'div[style="grid-area: switch;"]'
 CHART_UI_SELECTOR = 'div[style="grid-area: charts;"]'
 
-# 滚动条隐藏样式注入后的短等待，DOM 交互级，不入配置
-_SCROLLBAR_HIDE_WAIT_MS = 500
-
-
 def _image_merge(image1: str, image2: str, output: str):
 
     # 1. 读取两张图片
@@ -71,20 +67,14 @@ def symbol_screenshot(
         page.locator(timeframe_selector).click()
         page.wait_for_timeout(config.timeframe_redraw_wait_ms)
 
-        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        page.wait_for_timeout(_SCROLLBAR_HIDE_WAIT_MS)
-        page.evaluate("""(()=>{
-            const s=document.createElement('style');
-            s.id='__pw_hide_sb';
-            s.textContent='::-webkit-scrollbar{display:none!important}';
-            document.head.appendChild(s);
-        })()""")
-        page.wait_for_timeout(_SCROLLBAR_HIDE_WAIT_MS)
+        page.locator("#POSITIONS").scroll_into_view_if_needed()
+        page.add_style_tag(content='::-webkit-scrollbar{display:none!important}')
+        page.add_style_tag(content='div.futures-skeleton-root{display:none!important}')
 
-        skeleton = page.locator("div.futures-skeleton-root")
-        if skeleton.count() > 0:
-            skeleton.evaluate_all("els => els.forEach(el => el.remove())")
-            page.wait_for_timeout(500)
+        # skeleton = page.locator("div.futures-skeleton-root")
+        # if skeleton.count() > 0:
+        #     skeleton.evaluate_all("els => els.forEach(el => el.remove())")
+        #     page.wait_for_timeout(500)
 
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
@@ -97,7 +87,4 @@ def symbol_screenshot(
     except PlaywrightTimeout as exc:
         raise RuntimeError(f"Selector {CHART_UI_SELECTOR} not visible after {config.selector_timeout_ms}ms") from exc
     finally:
-        try:
-            page.evaluate("(()=>{const s=document.getElementById('__pw_hide_sb');if(s)s.remove()})()")
-        finally:
-            page.close()
+        page.close()
