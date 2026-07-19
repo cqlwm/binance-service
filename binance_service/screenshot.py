@@ -71,10 +71,7 @@ def symbol_screenshot(
         page.add_style_tag(content='::-webkit-scrollbar{display:none!important}')
         page.add_style_tag(content='div.futures-skeleton-root{display:none!important}')
 
-        # skeleton = page.locator("div.futures-skeleton-root")
-        # if skeleton.count() > 0:
-        #     skeleton.evaluate_all("els => els.forEach(el => el.remove())")
-        #     page.wait_for_timeout(500)
+        page.wait_for_timeout(500)
 
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
