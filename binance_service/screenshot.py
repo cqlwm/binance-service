@@ -44,7 +44,9 @@ def _dump_debug_snapshot(page: Page, tag: str) -> None:
         html_path.write_text(page.content(), encoding="utf-8")
         logger.error(
             "Debug HTML saved: %s (url=%s, title=%s)",
-            html_path, page.url, page.title(),
+            html_path,
+            page.url,
+            page.title(),
         )
     except PlaywrightError as exc:
         logger.error("Failed to dump debug HTML: %s", exc)
@@ -60,6 +62,7 @@ def _dump_debug_snapshot(page: Page, tag: str) -> None:
         logger.error("Debug PNG saved: %s", png_path)
     except PlaywrightError as exc:
         logger.error("Failed to dump debug PNG: %s", exc)
+
 
 def _image_merge(image1: str, image2: str, output: str):
 
@@ -100,7 +103,7 @@ def symbol_screenshot(
 
     url = f"{config.base_url}/{symbol}"
 
-page = get_or_create_page(browser, url, config.goto_timeout_ms)
+    page = get_or_create_page(browser, url, config.goto_timeout_ms)
     page.set_viewport_size({"width": config.window_width, "height": config.window_height})
 
     try:
@@ -112,8 +115,8 @@ page = get_or_create_page(browser, url, config.goto_timeout_ms)
         page.wait_for_timeout(config.timeframe_redraw_wait_ms)
 
         page.locator("#POSITIONS").scroll_into_view_if_needed()
-        page.add_style_tag(content='::-webkit-scrollbar{display:none!important}')
-        page.add_style_tag(content='div.futures-skeleton-root{display:none!important}')
+        page.add_style_tag(content="::-webkit-scrollbar{display:none!important}")
+        page.add_style_tag(content="div.futures-skeleton-root{display:none!important}")
 
         page.wait_for_timeout(500)
 
@@ -131,7 +134,6 @@ page = get_or_create_page(browser, url, config.goto_timeout_ms)
         return resolved_path
 
     except PlaywrightTimeout as exc:
-except PlaywrightTimeout as exc:
         _dump_debug_snapshot(page, f"chart_timeout_{symbol}_{timeframe}")
         raise RuntimeError(f"Selector {CHART_UI_SELECTOR} not visible after {config.selector_timeout_ms}ms") from exc
     finally:

@@ -12,6 +12,11 @@ from binance_service.storage_state import restore_storage_state, save_storage_st
 
 logger = logging.getLogger(__name__)
 
+# cloakbrowser 返回的 Browser 对象已 patch close() 会同步停止 playwright，
+# 故无需再用 sync_playwright() 上下文管理器包裹。
+DEFAULT_CONTEXT_TIMEOUT_MS = 30000
+DEFAULT_NAVIGATION_TIMEOUT_MS = 60000
+
 
 @contextmanager
 def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
@@ -27,37 +32,36 @@ def connect_browser(config: AppConfig) -> Generator[Browser, None, None]:
     vp: ViewportSize = {"width": w, "height": h}
 
     logger.info(
-        "Launching Chrome (headless=%s, window=%dx%d)",
+        "Launching cloakbrowser (headless=%s, window=%dx%d)",
         config.headless,
         w,
         h,
     )
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=config.headless,
-            args=list(config.browser.launch_args),
-        )
-        context = browser.new_context(
-            viewport=vp,
-            device_scale_factor=config.browser.device_scale_factor,
-        )
-        context.set_default_timeout(30000)
-        context.set_default_navigation_timeout(60000)
-        restore_storage_state(context, config.chrome.storage_state_path)
+    browser = launch(
+        headless=config.headless,
+        args=list(config.browser.launch_args),
+    )
+    context = browser.new_context(
+        viewport=vp,
+        device_scale_factor=config.browser.device_scale_factor,
+    )
+    context.set_default_timeout(DEFAULT_CONTEXT_TIMEOUT_MS)
+    context.set_default_navigation_timeout(DEFAULT_NAVIGATION_TIMEOUT_MS)
+    restore_storage_state(context, config.chrome.storage_state_path)
 
-        error_occurred = False
-        try:
-            yield browser
-        except BaseException:
-            error_occurred = True
-            raise
-        finally:
-            if not error_occurred:
-                save_storage_state(context, config.chrome.storage_state_path)
-            context.close()
-            browser.close()
-            logger.info("Closed Chrome !")
+    error_occurred = False
+    try:
+        yield browser
+    except BaseException:
+        error_occurred = True
+        raise
+    finally:
+        if not error_occurred:
+            save_storage_state(context, config.chrome.storage_state_path)
+        context.close()
+        browser.close()
+        logger.info("Closed cloakbrowser !")
 
 
 def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = None) -> Page:
@@ -68,7 +72,7 @@ def get_or_create_page(browser: Browser, target_url: str, timeout: int | None = 
                 logger.info("Reusing existing tab: %s", page.url)
                 return page
 
-# else 分支是防御性死代码--永远不会走到
+    # else 分支是防御性死代码--永远不会走到
     context = browser.contexts[0] if browser.contexts else browser.new_context()
     page = context.new_page()
     page.goto(target_url, wait_until="domcontentloaded", timeout=timeout)
