@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
-from PIL import Image
 from tempfile import NamedTemporaryFile, gettempdir as _gettempdir
 
-from playwright.sync_api import Browser
+from PIL import Image
+from playwright.sync_api import Browser, Page
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import ScreenshotConfig
@@ -16,6 +18,48 @@ logger = logging.getLogger("screenshot")
 # DOM 选择器，与页面结构强耦合，保留为代码常量
 SWITCH_UI_SELECTOR = 'div[style="grid-area: switch;"]'
 CHART_UI_SELECTOR = 'div[style="grid-area: charts;"]'
+
+# 调试快照存放目录（仅在选择器超时等失败时写入）
+DEBUG_SNAPSHOT_DIR = Path(_gettempdir()) / "binance_service_debug"
+# 快照抓取的单步超时：页面已处于异常态，不能用默认 30s，否则快照本身也会超时
+DEBUG_SNAPSHOT_TIMEOUT_MS = 5000
+
+
+def _dump_debug_snapshot(page: Page, tag: str) -> None:
+    """选择器超时等失败时，把当前页面截图 + HTML 落盘，便于离线排查 headless 渲染问题。
+
+    币安在 headless 下可能被风控拦截、跳转登录页、或卡在资源加载阶段，
+    仅凭选择器超时无法定位根因，所以失败时保留现场。
+    """
+    try:
+        DEBUG_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.error("Failed to create debug snapshot dir: %s", exc)
+        return
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # 1. HTML 优先：page.content() 读当前 DOM，不等待资源，几乎不会卡
+    html_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.html"
+    try:
+        html_path.write_text(page.content(), encoding="utf-8")
+        logger.error(
+            "Debug HTML saved: %s (url=%s, title=%s)",
+            html_path, page.url, page.title(),
+        )
+    except PlaywrightError as exc:
+        logger.error("Failed to dump debug HTML: %s", exc)
+
+    # 2. 视口截图
+    png_path = DEBUG_SNAPSHOT_DIR / f"{tag}_{ts}.png"
+    try:
+        page.screenshot(
+            path=str(png_path),
+            full_page=False,
+            timeout=DEBUG_SNAPSHOT_TIMEOUT_MS,
+        )
+        logger.error("Debug PNG saved: %s", png_path)
+    except PlaywrightError as exc:
+        logger.error("Failed to dump debug PNG: %s", exc)
 
 def _image_merge(image1: str, image2: str, output: str):
 
@@ -56,7 +100,7 @@ def symbol_screenshot(
 
     url = f"{config.base_url}/{symbol}"
 
-    page = get_or_create_page(browser, url, config.goto_timeout_ms)
+page = get_or_create_page(browser, url, config.goto_timeout_ms)
     page.set_viewport_size({"width": config.window_width, "height": config.window_height})
 
     try:
@@ -73,6 +117,11 @@ def symbol_screenshot(
 
         page.wait_for_timeout(500)
 
+        skeleton = page.locator('div[class="futures-skeleton-root"]')
+        if skeleton.count() > 0:
+            skeleton.evaluate_all("els => els.forEach(el => el.remove())")
+            page.wait_for_timeout(500)
+
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
             page.locator(CHART_UI_SELECTOR).screenshot(path=str(f2.name), scale="device")
@@ -82,6 +131,8 @@ def symbol_screenshot(
         return resolved_path
 
     except PlaywrightTimeout as exc:
+except PlaywrightTimeout as exc:
+        _dump_debug_snapshot(page, f"chart_timeout_{symbol}_{timeframe}")
         raise RuntimeError(f"Selector {CHART_UI_SELECTOR} not visible after {config.selector_timeout_ms}ms") from exc
     finally:
         page.close()
