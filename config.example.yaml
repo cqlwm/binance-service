@@ -33,10 +33,6 @@ poster:
   target_url: "https://www.binance.com/zh-CN/square"
   # 发帖 API 端点（用于拦截响应获取 shareLink）
   post_api_url: "https://www.binance.com/bapi/composite/v5/private/pgc/content/add"
-  # 用户信息接口端点（发帖前被动校验登录态，校验失败则中止发帖）
-  user_info_api_url: "https://www.binance.com/bapi/accounts/v1/private/account/user/userInfo"
-  # userInfo 接口响应等待超时（毫秒）
-  user_info_api_timeout_ms: 30000
   # 页面导航超时（毫秒）
   goto_timeout_ms: 60000
   # 输入资产标签后等待下拉列表渲染的时间（秒）
@@ -64,7 +60,7 @@ poster:
 # 合约 K 线截图运营参数
 screenshot:
   # 合约页面基础 URL（symbol 会拼接在后）
-  base_url: "https://www.binance.com/zh-CN/futures"
+  base_url: "https://www.binance.com/en/futures"
   # 截图视口尺寸（移动端布局）
   window_width: 430
   window_height: 932

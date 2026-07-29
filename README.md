@@ -99,7 +99,7 @@ uv run binance --config config.yaml save-storage
 uv run binance --config config.yaml post --base DOGE --content "UP UP UP" --image /path/to/image.jpg
 
 # 有头模式（弹出 Chrome 窗口，调试用）
-uv run binance --config config.yaml post --base DOGE --content "UP UP UP" --headed
+uv run binance --config config.yaml --headed post --base DOGE --content "UP UP UP"
 ```
 
 ### 3. 截取 K 线图
@@ -115,7 +115,7 @@ uv run binance --config config.yaml screenshot --symbol ETHUSDC --timeframe 4h -
 ### 4. 截图 + 发帖组合
 
 ```bash
-uv run binance --config config.yaml postx --base BTC --content "BTC looks bullish!"
+uv run binance --config config.yaml --headed postx --base BTC --content 'BTC looks bullish!'
 ```
 
 ## 库函数使用
@@ -313,7 +313,7 @@ cp config.example.yaml config.yaml
 | `window` | 浏览器窗口尺寸 | `width`、`height` |
 | `headless` | 是否无头模式运行 Chrome | `true` / `false` |
 | `browser` | Playwright 启动行为 | `device_scale_factor`、`launch_args` |
-| `poster` | 发帖运营参数 | `target_url`、`post_api_url`、`user_info_api_url`、`user_info_api_timeout_ms`、各类超时、`supported_image_extensions` |
+| `poster` | 发帖运营参数 | `target_url`、`post_api_url`、各类超时、`supported_image_extensions` |
 | `screenshot` | 截图运营参数 | `base_url`、视口尺寸、`timeframe_choices`、`default_timeframe` |
 | `cdp` | CDP 就绪探测轮询 | `retry_count`、`retry_interval` |
 
