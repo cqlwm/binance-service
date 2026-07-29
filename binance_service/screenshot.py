@@ -64,6 +64,16 @@ def _dump_debug_snapshot(page: Page, tag: str) -> None:
         logger.error("Failed to dump debug PNG: %s", exc)
 
 
+def _debug_screenshot(page: Page, debug_screenshot_dir: str, label: str) -> None:
+    """Save a full-page screenshot for debugging, named by step label."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    output_dir = Path(debug_screenshot_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    path = output_dir / f"{ts}_{label}.png"
+    page.screenshot(path=path.as_posix(), full_page=True)
+    logger.info("Debug screenshot saved: %s", path)
+
+
 def _image_merge(image1: str, image2: str, output: str):
 
     # 1. 读取两张图片
@@ -98,6 +108,7 @@ def symbol_screenshot(
     symbol: str,
     timeframe: str,
     output_path: str | None,
+    debug: bool = False,
 ) -> Path:
     resolved_path = _resolve_output_path(symbol, timeframe, output_path)
 
@@ -105,14 +116,20 @@ def symbol_screenshot(
 
     page = get_or_create_page(browser, url, config.goto_timeout_ms)
     page.set_viewport_size({"width": config.window_width, "height": config.window_height})
+    if debug:
+        _debug_screenshot(page, config.debug_screenshot_dir, "01_after_open_page")
 
     try:
         page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=config.selector_timeout_ms)
         page.wait_for_timeout(config.chart_initial_wait_ms)
+        if debug:
+            _debug_screenshot(page, config.debug_screenshot_dir, "02_after_chart_visible")
 
         timeframe_selector = f'div[id="{timeframe}"]'
         page.locator(timeframe_selector).click()
         page.wait_for_timeout(config.timeframe_redraw_wait_ms)
+        if debug:
+            _debug_screenshot(page, config.debug_screenshot_dir, "03_after_timeframe_switch")
 
         page.locator("#POSITIONS").scroll_into_view_if_needed()
         page.add_style_tag(content="::-webkit-scrollbar{display:none!important}")
@@ -124,6 +141,8 @@ def symbol_screenshot(
         if skeleton.count() > 0:
             skeleton.evaluate_all("els => els.forEach(el => el.remove())")
             page.wait_for_timeout(500)
+        if debug:
+            _debug_screenshot(page, config.debug_screenshot_dir, "04_after_style_cleanup")
 
         with NamedTemporaryFile(suffix=".png") as f1, NamedTemporaryFile(suffix=".png") as f2:
             page.locator(SWITCH_UI_SELECTOR).screenshot(path=str(f1.name), scale="device")
@@ -131,6 +150,8 @@ def symbol_screenshot(
             _image_merge(f1.name, f2.name, resolved_path.as_posix())
 
         logger.info("Screenshot saved: %s", resolved_path)
+        if debug:
+            _debug_screenshot(page, config.debug_screenshot_dir, "05_after_merge")
         return resolved_path
 
     except PlaywrightTimeout as exc:

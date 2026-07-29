@@ -70,6 +70,7 @@ def cmd_screenshot(args: argparse.Namespace) -> None:
             symbol=args.symbol,
             timeframe=args.timeframe,
             output=args.output,
+            debug=args.debug,
         )
     print(f"✅ 截图已保存: {result}")
 
@@ -83,6 +84,7 @@ def register_screenshot(sub: argparse.ArgumentParser) -> None:
         help="K 线时间周期，默认取配置中的 default_timeframe",
     )
     sub.add_argument("--output", default=None, help="截图保存路径")
+    sub.add_argument("--debug", action="store_true", help="启用调试截图")
     sub.set_defaults(func=cmd_screenshot)
 
 

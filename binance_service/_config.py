@@ -74,6 +74,7 @@ class ScreenshotConfig:
     default_timeframe: str
     timeframe_redraw_wait_ms: int
     chart_initial_wait_ms: int
+    debug_screenshot_dir: str
 
 
 @dataclass(frozen=True)
@@ -217,6 +218,7 @@ def _parse_screenshot(data: dict[str, object]) -> ScreenshotConfig:
         default_timeframe=_require_str(section, "default_timeframe", p),
         timeframe_redraw_wait_ms=_require_int(section, "timeframe_redraw_wait_ms", p),
         chart_initial_wait_ms=_require_int(section, "chart_initial_wait_ms", p),
+        debug_screenshot_dir=_expand(_require_str(section, "debug_screenshot_dir", p)),
     )
 
 

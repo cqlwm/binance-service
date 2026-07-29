@@ -82,6 +82,8 @@ screenshot:
   timeframe_redraw_wait_ms: 5000
   # 导航后等待图表初始加载的时间（毫秒）
   chart_initial_wait_ms: 3000
+  # 调试截图输出目录（--debug 时每步保存全页截图）
+  debug_screenshot_dir: "~/.debug_chrome/screenshots"
 
 # CDP 就绪探测轮询参数（save-storage 命令使用）
 cdp:

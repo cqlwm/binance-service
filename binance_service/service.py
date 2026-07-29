@@ -95,7 +95,9 @@ class BinanceService:
         """
         shot_cfg = self._app_config.screenshot
         resolved_timeframe = shot_cfg.default_timeframe if timeframe is None else timeframe
-        screenshot_path = self.symbol_screenshot(symbol=f"{base_asset}{quote}", timeframe=resolved_timeframe)
+        screenshot_path = self.symbol_screenshot(
+            symbol=f"{base_asset}{quote}", timeframe=resolved_timeframe, debug=debug
+        )
         image_path = screenshot_path.as_posix()
 
         return self.create_post(
@@ -110,6 +112,7 @@ class BinanceService:
         symbol: str,
         timeframe: str | None = None,
         output: str | None = None,
+        debug: bool = False,
     ) -> Path:
         """截取 Binance 合约 K 线图。
 
@@ -120,4 +123,4 @@ class BinanceService:
         resolved_timeframe = shot_cfg.default_timeframe if timeframe is None else timeframe
         if resolved_timeframe not in shot_cfg.timeframe_choices:
             raise ValueError(f"Invalid timeframe: {resolved_timeframe!r}. Choose from {shot_cfg.timeframe_choices}.")
-        return symbol_screenshot(self._browser_instance, shot_cfg, symbol, resolved_timeframe, output)
+        return symbol_screenshot(self._browser_instance, shot_cfg, symbol, resolved_timeframe, output, debug=debug)
