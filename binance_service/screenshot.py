@@ -11,13 +11,16 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from binance_service._config import ScreenshotConfig
-from binance_service._playwright import get_or_create_page
+from binance_service._playwright import NavigateFn, get_or_create_page
 
 logger = logging.getLogger("screenshot")
 
 # DOM 选择器，与页面结构强耦合，保留为代码常量
 SWITCH_UI_SELECTOR = 'div[style="grid-area: switch;"]'
 CHART_UI_SELECTOR = 'div[style="grid-area: charts;"]'
+
+# 合约 K 线接口前缀，忽略 query 参数（symbol/timeframe 等不同导致参数变化）
+KLINE_API_URL_PREFIX = "https://www.binance.com/fapi/v1/continuousKlines"
 
 # 调试快照存放目录（仅在选择器超时等失败时写入）
 DEBUG_SNAPSHOT_DIR = Path(_gettempdir()) / "binance_service_debug"
@@ -114,13 +117,19 @@ def symbol_screenshot(
 
     url = f"{config.base_url}/{symbol}"
 
-    page = get_or_create_page(browser, url, config.goto_timeout_ms)
+    # 等待 continuousKlines 返回 200 再继续，确认图表数据已加载
+    def wait_klines(page: Page, navigate: NavigateFn) -> None:
+        with page.expect_response(lambda r: r.url.startswith(KLINE_API_URL_PREFIX) and r.ok):
+            navigate()
+
+    page = get_or_create_page(browser, url, config.goto_timeout_ms, wait_klines)
+
     page.set_viewport_size({"width": config.window_width, "height": config.window_height})
     if debug:
         _debug_screenshot(page, config.debug_screenshot_dir, "01_after_open_page")
 
     try:
-        page.wait_for_selector(CHART_UI_SELECTOR, state="visible", timeout=config.selector_timeout_ms)
+        page.wait_for_selector(CHART_UI_SELECTOR, state="attached", timeout=config.selector_timeout_ms)
         page.wait_for_timeout(config.chart_initial_wait_ms)
         if debug:
             _debug_screenshot(page, config.debug_screenshot_dir, "02_after_chart_visible")
